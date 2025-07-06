@@ -61,126 +61,109 @@
             
             <!-- Conteúdo Principal da página -->
             <div class="col-md-9 col-lg-10 main-content">
-                <div class="content-header">
-                    <h2>Dashboard</h2>
-                    <p>Bem-vindo ao sistema principal da Krolik</p>
-                </div>
-                
-                <div class="content-body">
-                    <div class="row">
-                        <!-- Cards de resumo do dashboard -->
-                        <div class="col-md-6 col-lg-3 mb-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Usuários Ativos</h5>
-                                    <p class="card-text display-6">150</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-lg-3 mb-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Projetos</h5>
-                                    <p class="card-text display-6">25</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-lg-3 mb-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Tarefas</h5>
-                                    <p class="card-text display-6">89</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-lg-3 mb-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">Mensagens</h5>
-                                    <p class="card-text display-6">1.2k</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Removido dashboard e cards -->
             </div>
         </div>
     </div>
 
     <!-- Modal do Chat (aparece ao clicar no botão) -->
     <div class="modal fade" id="chatModal" tabindex="-1" aria-labelledby="chatModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="chatModalLabel">
                         <i class="fas fa-comments"></i> KChat
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openUserNameModal()" title="Configurar nome">
+                            <i class="fas fa-user-cog"></i>
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <div class="chat-container">
-                        <!-- Seletor de Grupo (dropdown + botão novo grupo) -->
-                        <div class="group-selector mb-3">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <select class="form-select" id="groupSelect">
-                                        <option value="">Selecione um grupo...</option>
-                                    </select>
+                <div class="modal-body p-0">
+                    <div class="chat-layout">
+                        <!-- Lista de Grupos (lateral esquerda) -->
+                        <div class="groups-sidebar">
+                            <div class="groups-header">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="mb-0">Conversas</h6>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="createNewGroup()">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
                                 </div>
-                                <div class="col-md-6">
-                                    <button class="btn btn-outline-primary" onclick="createNewGroup()">
-                                        <i class="fas fa-plus"></i> Novo Grupo
+                                <div class="mb-2">
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="openPrivateChatModal()" title="Nova mensagem privada">
+                                        <i class="fas fa-user-plus"></i>
                                     </button>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Área de Mensagens (lista de mensagens do grupo) -->
-                        <div class="messages-container" id="messagesContainer">
-                            <div class="text-center text-muted">
-                                <i class="fas fa-comments fa-3x mb-3"></i>
-                                <p>Selecione um grupo para começar a conversar</p>
+                            
+                            <div class="groups-list" id="groupsList">
+                                <!-- Grupos serão carregados aqui dinamicamente -->
+                                <div class="text-center text-muted p-3">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <p class="mt-2">Carregando grupos...</p>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Área de Envio de Mensagem -->
-                        <div class="message-input-container">
-                            <form id="messageForm" class="message-form">
-                                <div class="row">
-                                    <div class="col-md-8">
-                                        <textarea 
-                                            class="form-control" 
-                                            id="messageInput" 
-                                            placeholder="Digite sua mensagem..."
-                                            rows="2"
-                                        ></textarea>
+                        <!-- Área de Chat (lado direito) -->
+                        <div class="chat-area">
+                            <!-- Cabeçalho do Chat -->
+                            <div class="chat-header" id="chatHeader" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-0" id="currentGroupName">Nome do Grupo</h6>
+                                        <small class="text-muted" id="currentGroupInfo">Informações do grupo</small>
                                     </div>
-                                    <div class="col-md-4">
-                                        <div class="d-flex gap-2">
-                                            <!-- Botão para adicionar link -->
-                                            <button type="button" class="btn btn-outline-secondary" onclick="toggleLinkInput()">
-                                                <i class="fas fa-link"></i>
-                                            </button>
-                                            <!-- Botão para anexar arquivo -->
-                                            <label for="fileInput" class="btn btn-outline-secondary">
-                                                <i class="fas fa-paperclip"></i>
-                                            </label>
-                                            <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(event)">
-                                            <!-- Botão de enviar mensagem -->
-                                            <button type="submit" class="btn btn-primary">
-                                                <i class="fas fa-paper-plane"></i>
-                                            </button>
+                                    <div class="chat-actions">
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="openEditGroupModal()" title="Editar grupo">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="openDeleteGroupModal()" title="Remover grupo">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Área de Mensagens -->
+                            <div class="messages-container" id="messagesContainer">
+                                <div class="text-center text-muted">
+                                    <i class="fas fa-comments fa-3x mb-3"></i>
+                                    <p>Selecione uma conversa para começar</p>
+                                </div>
+                            </div>
+
+                            <!-- Área de Envio de Mensagem -->
+                            <div class="message-input-container" id="messageInputContainer" style="display: none;">
+                                <form id="messageForm" class="message-form">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <textarea 
+                                                class="form-control" 
+                                                id="messageInput" 
+                                                placeholder="Digite sua mensagem..."
+                                                rows="2"
+                                            ></textarea>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex gap-2">
+                                                <!-- Botão para anexar arquivo -->
+                                                <label for="fileInput" class="btn btn-outline-secondary">
+                                                    <i class="fas fa-paperclip"></i>
+                                                </label>
+                                                <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(event)">
+                                                <!-- Botão de enviar mensagem -->
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                
-                                <!-- Campo de link (aparece ao clicar no botão de link) -->
-                                <div class="row mt-2" id="linkInputRow" style="display: none;">
-                                    <div class="col-12">
-                                        <input type="url" class="form-control" id="linkInput" placeholder="Cole o link aqui...">
-                                    </div>
-                                </div>
-                            </form>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -207,6 +190,136 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="submitNewGroup()">Criar Grupo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Configurar Nome do Usuário -->
+    <div class="modal fade" id="userNameModal" tabindex="-1" aria-labelledby="userNameModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userNameModalLabel">
+                        <i class="fas fa-user"></i> Configurar Nome
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="userNameForm">
+                        <div class="mb-3">
+                            <label for="userLoginInput" class="form-label">Login</label>
+                            <input type="text" class="form-control" id="userLoginInput" placeholder="Digite seu login..." required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="userPasswordInput" class="form-label">Senha</label>
+                            <input type="password" class="form-control" id="userPasswordInput" placeholder="Digite sua senha..." required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="userNameInput" class="form-label">Como você gostaria de ser chamado?</label>
+                            <input type="text" class="form-control" id="userNameInput" placeholder="Digite seu nome..." required>
+                            <div class="form-text">Este nome será exibido nas suas mensagens</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="saveUserName()">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação de Nome Alterado -->
+    <div class="modal fade" id="userNameChangedModal" tabindex="-1" aria-labelledby="userNameChangedModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="userNameChangedModalLabel">
+                        <i class="fas fa-check-circle"></i> Nome alterado
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p>Seu nome foi alterado com sucesso!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Mensagem Privada -->
+    <div class="modal fade" id="privateChatModal" tabindex="-1" aria-labelledby="privateChatModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="privateChatModalLabel">
+                        <i class="fas fa-user-plus"></i> Nova Mensagem Privada
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Selecione o usuário para conversar:</label>
+                        <div id="usuariosList" class="usuarios-list">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p class="mt-2">Carregando usuários...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Grupo -->
+    <div class="modal fade" id="editGroupModal" tabindex="-1" aria-labelledby="editGroupModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editGroupModalLabel">
+                        <i class="fas fa-edit"></i> Editar Grupo
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editGroupForm">
+                        <div class="mb-3">
+                            <label for="editGroupName" class="form-label">Novo nome do grupo</label>
+                            <input type="text" class="form-control" id="editGroupName" placeholder="Digite o novo nome..." required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveGroupEdit()">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Confirmar Remoção de Grupo -->
+    <div class="modal fade" id="deleteGroupModal" tabindex="-1" aria-labelledby="deleteGroupModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteGroupModalLabel">
+                        <i class="fas fa-exclamation-triangle text-danger"></i> Confirmar Remoção
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção!</strong> Esta ação não pode ser desfeita.
+                    </div>
+                    <p>Tem certeza que deseja remover o grupo <strong id="deleteGroupName">"Nome do Grupo"</strong>?</p>
+                    <p class="text-muted">Todas as mensagens deste grupo serão perdidas permanentemente.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDeleteGroup()">
+                        <i class="fas fa-trash"></i> Remover Grupo
+                    </button>
                 </div>
             </div>
         </div>

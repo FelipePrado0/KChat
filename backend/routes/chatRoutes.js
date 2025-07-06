@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 // Importa o controller do chat
 const ChatController = require('../controllers/chatController');
+const userController = require('../controllers/userController');
 
 // Instancia o controller do chat
 const chatController = new ChatController();
@@ -10,11 +11,14 @@ const chatController = new ChatController();
 // Rota para enviar mensagem (suporta upload de arquivo)
 // POST /api/chat/messages
 // Usa o middleware de upload e depois chama o método de envio
-router.post('/messages', chatController.uploadMiddleware(), chatController.sendMessage.bind(chatController));
+router.post('/messages', (req, res, next) => {
+    console.log('--- [ROUTE] POST /messages chamada ---');
+    next();
+}, chatController.uploadMiddleware(), chatController.sendMessage.bind(chatController));
 
 // Rota para listar mensagens de um grupo
-// GET /api/chat/conversations/:conversation_id/messages?empresa=XXX
-router.get('/conversations/:conversation_id/messages', chatController.getMessagesByConversation.bind(chatController));
+// GET /api/groups/:group_id/messages?empresa=XXX
+router.get('/groups/:group_id/messages', chatController.getMessagesByGroup.bind(chatController));
 
 // Rota para editar uma mensagem
 // PUT /api/chat/messages/:id
@@ -31,6 +35,14 @@ router.get('/messages/empresa/:empresa', chatController.getMessagesByEmpresa.bin
 // Rota para buscar uma mensagem por ID
 // GET /api/chat/messages/:id
 router.get('/messages/:id', chatController.getMessageById.bind(chatController));
+
+// Rota para inserir ou atualizar usuário
+// POST /usuarios/upsert
+router.post('/usuarios/upsert', userController.upsertUsuario);
+
+// Rota para listar todos os usuários
+// GET /usuarios
+router.get('/usuarios', userController.listUsuarios);
 
 // Exporta o router para uso no server.js
 module.exports = router;

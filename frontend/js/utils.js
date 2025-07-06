@@ -10,7 +10,7 @@
 
 // Configurações da API (ajuste BASE_URL se necessário)
 const API_CONFIG = {
-    BASE_URL: 'http://localhost:3008/api', // URL base do backend
+    BASE_URL: 'http://localhost:3000/api', // URL base do backend
     ENDPOINTS: {
         AUTH: {
             LOGIN: '/auth/login',
@@ -20,9 +20,9 @@ const API_CONFIG = {
             VERIFY: '/auth/verify'
         },
         CHAT: {
-            MESSAGES: '/chat/messages',
-            RECENT: '/chat/messages/recent',
-            STATS: '/chat/stats'
+            MESSAGES: '/messages',
+            RECENT: '/messages/recent',
+            STATS: '/stats'
         }
     }
 };

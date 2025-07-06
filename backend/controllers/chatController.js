@@ -1,9 +1,10 @@
 // Importa os models necessários para manipular mensagens e conversas
 const MessageModel = require('../models/messageModel');
-const ConversationModel = require('../models/conversationModel');
+const GroupModel = require('../models/groupModel');
 const multer = require('multer'); // Middleware para upload de arquivos
 const path = require('path'); // Utilitário de caminhos
 const fs = require('fs'); // Sistema de arquivos
+const { logApi } = require('../utils/dbInit');
 
 // Configuração do multer para upload de arquivos
 const storage = multer.diskStorage({
@@ -55,8 +56,13 @@ class ChatController {
      */
     async sendMessage(req, res) {
         try {
+            console.log('--- [sendMessage] Início ---');
+            console.log('Body recebido:', req.body);
+            if (req.file) {
+                console.log('Arquivo recebido:', req.file.filename);
+            }
             // Extrai dados do corpo da requisição
-            const { conversation_id, empresa, usuario, mensagem, anexo_link } = req.body;
+            const { group_id, empresa, usuario, mensagem, anexo_link } = req.body;
             let anexoArquivo = null;
 
             // Se houver arquivo enviado, salva o nome
@@ -65,7 +71,8 @@ class ChatController {
             }
 
             // Validações básicas
-            if (!conversation_id || !empresa || !usuario || !mensagem) {
+            if (!group_id || !empresa || !usuario || !mensagem) {
+                console.log('Validação falhou: campos obrigatórios ausentes');
                 return res.status(400).json({
                     success: false,
                     message: 'Conversa, empresa, usuário e mensagem são obrigatórios'
@@ -73,6 +80,7 @@ class ChatController {
             }
 
             if (mensagem.trim().length === 0) {
+                console.log('Validação falhou: mensagem vazia');
                 return res.status(400).json({
                     success: false,
                     message: 'Mensagem não pode estar vazia'
@@ -80,8 +88,10 @@ class ChatController {
             }
 
             // Verifica se a conversa existe
-            const conversationExists = await ConversationModel.exists(conversation_id, empresa);
+            const conversationExists = await GroupModel.exists(group_id, empresa);
+            console.log('Conversa existe?', conversationExists);
             if (!conversationExists) {
+                console.log('Conversa não encontrada:', group_id, empresa);
                 return res.status(404).json({
                     success: false,
                     message: 'Conversa não encontrada'
@@ -89,16 +99,30 @@ class ChatController {
             }
 
             // Cria a mensagem no banco
+            console.log('Criando mensagem no banco...');
             const message = await MessageModel.create(
-                conversation_id, 
+                group_id, 
                 empresa, 
                 usuario, 
                 mensagem.trim(),
                 anexo_link || null,
                 anexoArquivo
             );
+            // Log manual do envio de mensagem
+            logApi({
+                empresa,
+                rota: req.originalUrl,
+                metodo: req.method,
+                status_code: 201,
+                mensagem: 'Mensagem enviada com sucesso',
+                body_request: req.body,
+                body_response: message,
+                erro: null
+            });
+            console.log('Mensagem criada:', message);
 
             // Retorna sucesso
+            console.log('--- [sendMessage] Fim: sucesso ---');
             res.status(201).json({
                 success: true,
                 message: 'Mensagem enviada com sucesso',
@@ -117,11 +141,11 @@ class ChatController {
 
     /**
      * Lista mensagens de um grupo específico
-     * GET /api/chat/conversations/:conversation_id/messages
+     * GET /api/chat/groups/:group_id/messages
      */
-    async getMessagesByConversation(req, res) {
+    async getMessagesByGroup(req, res) {
         try {
-            const { conversation_id } = req.params;
+            const { group_id } = req.params;
             const { empresa } = req.query;
 
             // Validação do parâmetro empresa
@@ -133,7 +157,7 @@ class ChatController {
             }
 
             // Verifica se a conversa existe
-            const conversationExists = await ConversationModel.exists(conversation_id, empresa);
+            const conversationExists = await GroupModel.exists(group_id, empresa);
             if (!conversationExists) {
                 return res.status(404).json({
                     success: false,
@@ -142,7 +166,7 @@ class ChatController {
             }
 
             // Busca as mensagens do grupo
-            const messages = await MessageModel.findByConversation(conversation_id, empresa);
+            const messages = await MessageModel.findByGroup(group_id, empresa);
 
             // Retorna as mensagens
             res.json({

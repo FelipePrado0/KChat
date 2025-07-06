@@ -5,37 +5,34 @@ const { db } = require('../utils/dbInit');
 class MessageModel {
     /**
      * Cria uma nova mensagem no banco
-     * @param {number} conversationId - ID do grupo
+     * @param {number} groupId - ID do grupo
      * @param {string} empresa - Nome da empresa
      * @param {string} usuario - Nome do usuário
      * @param {string} mensagem - Texto da mensagem
      * @param {string|null} anexoLink - Link opcional
      * @param {string|null} anexoArquivo - Nome do arquivo opcional
      */
-    static async create(conversationId, empresa, usuario, mensagem, anexoLink = null, anexoArquivo = null) {
+    static async create(groupId, empresa, usuario, mensagem, anexoLink = null, anexoArquivo = null) {
         return new Promise((resolve, reject) => {
             const query = `
-                INSERT INTO messages (conversation_id, empresa, usuario, mensagem, anexo_link, anexo_arquivo) 
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO messages (group_id, empresa, usuario, mensagem, anexo_link, anexo_arquivo, criado_em)
+                VALUES (?, ?, ?, ?, ?, ?, DATETIME('now', 'localtime'))
             `;
             // Executa o insert no banco
-            db.run(query, [conversationId, empresa, usuario, mensagem, anexoLink, anexoArquivo], function(err) {
+            db.run(query, [groupId, empresa, usuario, mensagem, anexoLink, anexoArquivo], function(err) {
                 if (err) {
                     reject(err);
                 } else {
                     // Retorna o objeto da mensagem criada
                     resolve({
                         id: this.lastID,
-                        conversation_id: conversationId,
+                        group_id: groupId,
                         empresa,
                         usuario,
                         mensagem,
                         anexo_link: anexoLink,
                         anexo_arquivo: anexoArquivo,
-                        hora: new Date().toISOString(),
-                        editada: false,
-                        deletada: false,
-                        criado_em: new Date().toISOString()
+                        criado_em: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
                     });
                 }
             });
@@ -44,18 +41,18 @@ class MessageModel {
 
     /**
      * Lista todas as mensagens de um grupo
-     * @param {number} conversationId - ID do grupo
+     * @param {number} groupId - ID do grupo
      * @param {string} empresa - Nome da empresa
      */
-    static async findByConversation(conversationId, empresa) {
+    static async findByGroup(groupId, empresa) {
         return new Promise((resolve, reject) => {
             const query = `
                 SELECT * FROM messages 
-                WHERE conversation_id = ? AND empresa = ? AND deletada = 0
-                ORDER BY hora ASC
+                WHERE group_id = ? AND empresa = ? AND deletada = 0
+                ORDER BY criado_em ASC
             `;
             // Busca todas as mensagens do grupo
-            db.all(query, [conversationId, empresa], (err, rows) => {
+            db.all(query, [groupId, empresa], (err, rows) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -144,9 +141,9 @@ class MessageModel {
             const query = `
                 SELECT m.*, c.nome_grupo 
                 FROM messages m
-                JOIN conversations c ON m.conversation_id = c.id
+                JOIN groups c ON m.group_id = c.id
                 WHERE m.empresa = ? AND m.deletada = 0
-                ORDER BY m.hora DESC
+                ORDER BY m.criado_em DESC
                 LIMIT ?
             `;
             // Busca as mensagens da empresa
@@ -162,17 +159,17 @@ class MessageModel {
 
     /**
      * Conta o número de mensagens de um grupo
-     * @param {number} conversationId - ID do grupo
+     * @param {number} groupId - ID do grupo
      * @param {string} empresa - Nome da empresa
      */
-    static async countByConversation(conversationId, empresa) {
+    static async countByGroup(groupId, empresa) {
         return new Promise((resolve, reject) => {
             const query = `
                 SELECT COUNT(*) as count FROM messages 
-                WHERE conversation_id = ? AND empresa = ? AND deletada = 0
+                WHERE group_id = ? AND empresa = ? AND deletada = 0
             `;
             // Conta as mensagens do grupo
-            db.get(query, [conversationId, empresa], (err, row) => {
+            db.get(query, [groupId, empresa], (err, row) => {
                 if (err) {
                     reject(err);
                 } else {

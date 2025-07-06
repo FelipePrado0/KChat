@@ -6,14 +6,15 @@ const path = require('path'); // Utilitário para lidar com caminhos de arquivos
 const multer = require('multer'); // Middleware para upload de arquivos
 
 // Importa as rotas
-const conversationRoutes = require('./routes/conversationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const privateMessageRoutes = require('./routes/privateMessageRoutes');
+const groupRoutes = require('./routes/groupRoutes');
 
 // Importa utilitário para inicializar o banco de dados
-const { initializeDatabase } = require('./utils/dbInit');
+const { initializeDatabase, logApi } = require('./utils/dbInit');
 
 // Configurações do servidor
-const PORT = process.env.PORT || 3008; // Porta padrão
+const PORT = process.env.PORT || 3000; // Porta padrão
 const NODE_ENV = process.env.NODE_ENV || 'development'; // Ambiente
 
 // Cria a aplicação Express
@@ -31,14 +32,8 @@ const limiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Aplica o rate limiting globalmente
-app.use(limiter);
-
-// Habilita CORS para origens específicas (frontend)
-app.use(cors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5500', 'http://127.0.0.1:5500'],
-    credentials: true
-}));
+// Habilita CORS para qualquer origem (apenas para testes)
+app.use(cors());
 
 // Permite receber JSON e dados de formulários
 app.use(express.json());
@@ -66,8 +61,9 @@ app.use((err, req, res, next) => {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Registra as rotas principais
-app.use('/api', conversationRoutes); // Rotas de grupos
-app.use('/api/chat', chatRoutes);    // Rotas de mensagens
+app.use('/api', groupRoutes);
+app.use('/api', chatRoutes);
+app.use('/api/private-message', privateMessageRoutes);
 
 // Rota de health check (verifica se a API está online)
 app.get('/api/health', (req, res) => {
@@ -82,13 +78,61 @@ app.get('/api/health', (req, res) => {
 app.get('/api/uploads/:filename', (req, res) => {
     const filename = req.params.filename;
     const filePath = path.join(__dirname, 'uploads', filename);
+    // Log manual do download
+    logApi({
+        empresa: null,
+        rota: req.originalUrl,
+        metodo: req.method,
+        status_code: 200,
+        mensagem: 'Download de arquivo',
+        body_request: req.body,
+        body_response: { file: filename },
+        erro: null
+    });
     res.sendFile(filePath);
+});
+
+// Middleware para logar todas as respostas da API
+app.use((req, res, next) => {
+    const oldJson = res.json;
+    res.json = function (body) {
+        // Tenta extrair empresa de body, query ou headers
+        let empresa = null;
+        if (req.body && req.body.empresa) empresa = req.body.empresa;
+        else if (req.query && req.query.empresa) empresa = req.query.empresa;
+        else if (req.headers && req.headers.empresa) empresa = req.headers.empresa;
+        logApi({
+            empresa,
+            rota: req.originalUrl,
+            metodo: req.method,
+            status_code: res.statusCode,
+            mensagem: body && body.message ? body.message : null,
+            body_request: req.body,
+            body_response: body,
+            erro: null
+        });
+        return oldJson.call(this, body);
+    };
+    next();
 });
 
 // Middleware para tratar erros gerais e de upload
 app.use((err, req, res, next) => {
+    let empresa = null;
+    if (req.body && req.body.empresa) empresa = req.body.empresa;
+    else if (req.query && req.query.empresa) empresa = req.query.empresa;
+    else if (req.headers && req.headers.empresa) empresa = req.headers.empresa;
+    logApi({
+        empresa,
+        rota: req.originalUrl,
+        metodo: req.method,
+        status_code: 500,
+        mensagem: 'Erro interno do servidor',
+        body_request: req.body,
+        body_response: null,
+        erro: err && err.message ? err.message : String(err)
+    });
     console.error('Erro:', err);
-    
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
             return res.status(400).json({
@@ -97,7 +141,6 @@ app.use((err, req, res, next) => {
             });
         }
     }
-    
     res.status(500).json({
         success: false,
         message: 'Erro interno do servidor'
