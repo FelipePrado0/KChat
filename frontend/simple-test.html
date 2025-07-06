@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Simples - Painel Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .chat-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: white;
+            z-index: 1000;
+            border: 3px solid red;
+            display: none;
+        }
+        
+        .chat-content {
+            padding: 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            margin: -20px -20px 20px -20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .chat-input button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .chat-input button:hover {
+            background: #0056b3;
+        }
+        
+        .logs {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        
+        .log-error {
+            color: #dc3545;
+        }
+        
+        .log-info {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Teste Simples - Painel de Chat</h1>
+        <p>Este é um teste isolado para verificar se o painel fecha automaticamente.</p>
+        
+        <button onclick="togglePanel()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            Abrir/Fechar Painel
+        </button>
+        
+        <div class="logs" id="logs">
+            <div class="log-entry log-info">Logs aparecerão aqui...</div>
+        </div>
+    </div>
+
+    <!-- Painel de Chat Simples -->
+    <div id="chatPanel" class="chat-panel">
+        <div class="chat-content">
+            <div class="chat-header">
+                <h3>Chat Simples</h3>
+                <button onclick="togglePanel()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer;">×</button>
+            </div>
+            
+            <div class="chat-messages" id="messages">
+                <p>Mensagens aparecerão aqui...</p>
+            </div>
+            
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Digite sua mensagem..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Captura logs
+        const logsDiv = document.getElementById('logs');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        function addLog(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), 'info');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog(args.join(' '), 'error');
+        };
+        
+        // Limpa logs antigos
+        logsDiv.innerHTML = '<div class="log-entry log-info">Logs do console...</div>';
+        
+        // Função para alternar o painel
+        function togglePanel() {
+            console.log('🔍 [togglePanel] Função chamada');
+            const panel = document.getElementById('chatPanel');
+            const currentDisplay = panel.style.display;
+            
+            console.log('🔍 [togglePanel] Display atual:', currentDisplay);
+            
+            if (currentDisplay === 'none' || currentDisplay === '') {
+                console.log('🔍 [togglePanel] Abrindo painel...');
+                panel.style.display = 'block';
+                console.log('✅ [togglePanel] Painel aberto');
+            } else {
+                console.log('🔍 [togglePanel] Fechando painel...');
+                panel.style.display = 'none';
+                console.log('✅ [togglePanel] Painel fechado');
+            }
+        }
+        
+        // Função para enviar mensagem
+        function sendMessage() {
+            console.log('🔍 [sendMessage] Enviando mensagem...');
+            
+            const input = document.getElementById('messageInput');
+            const messages = document.getElementById('messages');
+            const message = input.value.trim();
+            
+            if (message) {
+                console.log('🔍 [sendMessage] Mensagem:', message);
+                
+                // Verifica estado do painel antes
+                const panel = document.getElementById('chatPanel');
+                const displayBefore = panel.style.display;
+                console.log('🔍 [sendMessage] Estado do painel ANTES:', displayBefore);
+                
+                // Adiciona mensagem
+                const messageDiv = document.createElement('p');
+                messageDiv.textContent = `Você: ${message}`;
+                messages.appendChild(messageDiv);
+                
+                // Limpa input
+                input.value = '';
+                
+                // Verifica estado do painel depois
+                const displayAfter = panel.style.display;
+                console.log('🔍 [sendMessage] Estado do painel DEPOIS:', displayAfter);
+                
+                if (displayBefore !== displayAfter) {
+                    console.error('❌ [sendMessage] ATENÇÃO: Estado do painel mudou!');
+                }
+                
+                console.log('✅ [sendMessage] Mensagem enviada');
+            }
+        }
+        
+        // Função para lidar com Enter
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        // Observer para monitorar mudanças no painel
+        const panel = document.getElementById('chatPanel');
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                console.log('🔍 [Observer] Mudança detectada:', mutation.type, mutation.attributeName);
+                
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                    const display = panel.style.display;
+                    console.log('🔍 [Observer] Display atual:', display);
+                    
+                    if (display === 'none') {
+                        console.log('🔍 [Observer] Painel fechado por mudança de estilo!');
+                        console.log('🔍 [Observer] Stack:', new Error().stack);
+                    }
+                }
+            });
+        });
+        
+        observer.observe(panel, {
+            attributes: true,
+            attributeFilter: ['style']
+        });
+        
+        console.log('🚀 Teste simples inicializado');
+        console.log('🔍 Observer configurado para o painel');
+    </script>
+</body>
+</html> 

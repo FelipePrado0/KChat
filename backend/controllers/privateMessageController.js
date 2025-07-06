@@ -9,40 +9,60 @@ class PrivateMessageController {
      */
     static async createPrivateMessage(req, res) {
         try {
+            console.log('--- [createPrivateMessage] Início ---');
+            console.log('Body recebido:', req.body);
+            if (req.file) {
+                console.log('Arquivo recebido:', req.file.filename);
+            }
+            
             // Extrai dados do corpo da requisição
-            const { empresa, remetente, destinatario, mensagem, anexo_link, anexo_arquivo } = req.body;
+            const { empresa, remetente, destinatario, mensagem, anexo_link } = req.body;
+            let anexoArquivo = null;
+
+            // Se houver arquivo enviado, salva o nome
+            if (req.file) {
+                anexoArquivo = req.file.filename;
+            }
 
             // Validações básicas
-            if (!empresa || !remetente || !destinatario || !mensagem) {
+            if (!empresa || !remetente || !destinatario) {
+                console.log('Validação falhou: campos obrigatórios ausentes');
                 return res.status(400).json({
                     success: false,
-                    message: 'Empresa, remetente, destinatário e mensagem são obrigatórios'
+                    message: 'Empresa, remetente e destinatário são obrigatórios'
                 });
             }
 
             if (remetente === destinatario) {
+                console.log('Validação falhou: tentativa de enviar mensagem para si mesmo');
                 return res.status(400).json({
                     success: false,
                     message: 'Não é possível enviar mensagem para si mesmo'
                 });
             }
 
-            if (mensagem.trim().length === 0) {
+            // Permite mensagem vazia se houver arquivo anexado
+            if (!mensagem && !anexoArquivo) {
+                console.log('Validação falhou: mensagem vazia e sem arquivo');
                 return res.status(400).json({
                     success: false,
-                    message: 'A mensagem não pode estar vazia'
+                    message: 'Mensagem ou arquivo é obrigatório'
                 });
             }
 
             // Cria a mensagem privada no banco
+            console.log('Criando mensagem privada no banco...');
             const privateMessage = await PrivateMessageModel.create(
                 empresa, 
                 remetente.trim(), 
                 destinatario.trim(), 
                 mensagem.trim(),
                 anexo_link || null,
-                anexo_arquivo || null
+                anexoArquivo
             );
+
+            console.log('Mensagem privada criada:', privateMessage);
+            console.log('--- [createPrivateMessage] Fim: sucesso ---');
 
             // Retorna sucesso
             res.status(201).json({

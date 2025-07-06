@@ -53,7 +53,7 @@
                 
                 <!-- Botão do Chat (abre o modal) -->
                 <div class="chat-button-container">
-                    <button class="btn btn-primary chat-button" onclick="openChatModal()">
+                    <button class="btn btn-primary chat-button" onclick="toggleChatPanel()">
                         <i class="fas fa-comments"></i> Chat
                     </button>
                 </div>
@@ -61,56 +61,33 @@
             
             <!-- Conteúdo Principal da página -->
             <div class="col-md-9 col-lg-10 main-content">
-                <!-- Removido dashboard e cards -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal do Chat (aparece ao clicar no botão) -->
-    <div class="modal fade" id="chatModal" tabindex="-1" aria-labelledby="chatModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="chatModalLabel">
-                        <i class="fas fa-comments"></i> KChat
-                    </h5>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openUserNameModal()" title="Configurar nome">
-                            <i class="fas fa-user-cog"></i>
-                        </button>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                </div>
-                <div class="modal-body p-0">
+                <!-- Painel fixo do Chat -->
+                <div id="chatPanel" class="chat-panel hidden" style="display: none;">
                     <div class="chat-layout">
                         <!-- Lista de Grupos (lateral esquerda) -->
                         <div class="groups-sidebar">
                             <div class="groups-header">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="mb-0">Conversas</h6>
-                                    <button class="btn btn-outline-primary btn-sm" onclick="createNewGroup()">
-                                        <i class="fas fa-plus"></i>
-                                    </button>
-                                </div>
+                                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Conversas</h6>
+                                <button class="btn btn-outline-primary btn-sm" onclick="createNewGroup()">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                                 <div class="mb-2">
                                     <button class="btn btn-outline-secondary btn-sm" onclick="openPrivateChatModal()" title="Nova mensagem privada">
                                         <i class="fas fa-user-plus"></i>
                                     </button>
                                 </div>
                             </div>
-                            
                             <div class="groups-list" id="groupsList">
-                                <!-- Grupos serão carregados aqui dinamicamente -->
                                 <div class="text-center text-muted p-3">
                                     <i class="fas fa-spinner fa-spin"></i>
                                     <p class="mt-2">Carregando grupos...</p>
                                 </div>
                             </div>
                         </div>
-
                         <!-- Área de Chat (lado direito) -->
                         <div class="chat-area">
-                            <!-- Cabeçalho do Chat -->
                             <div class="chat-header" id="chatHeader" style="display: none;">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div>
@@ -127,46 +104,45 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Área de Mensagens -->
                             <div class="messages-container" id="messagesContainer">
                                 <div class="text-center text-muted">
                                     <i class="fas fa-comments fa-3x mb-3"></i>
                                     <p>Selecione uma conversa para começar</p>
                                 </div>
                             </div>
-
-                            <!-- Área de Envio de Mensagem -->
                             <div class="message-input-container" id="messageInputContainer" style="display: none;">
-                                <form id="messageForm" class="message-form">
+                                <div class="message-form">
                                     <div class="row">
                                         <div class="col-md-8">
                                             <textarea 
                                                 class="form-control" 
                                                 id="messageInput" 
                                                 placeholder="Digite sua mensagem..."
-                                                rows="2"
+                                                rows="1"
+                                                maxlength="2000"
                                             ></textarea>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="d-flex gap-2">
-                                                <!-- Botão para anexar arquivo -->
                                                 <label for="fileInput" class="btn btn-outline-secondary">
                                                     <i class="fas fa-paperclip"></i>
                                                 </label>
                                                 <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(event)">
-                                                <!-- Botão de enviar mensagem -->
-                                                <button type="submit" class="btn btn-primary">
+                                                <button type="button" id="audioBtn" class="btn btn-outline-secondary" title="Gravar áudio">
+                                                    <i class="fas fa-microphone"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-primary" onclick="handleMessageSubmit(event)">
                                                     <i class="fas fa-paper-plane"></i>
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
-                                </form>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <!-- Fim do painel fixo do Chat -->
             </div>
         </div>
     </div>
@@ -328,7 +304,6 @@
     <!-- Scripts do Bootstrap e do projeto -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/utils.js"></script> <!-- Funções auxiliares -->
-    <script src="js/chat.js"></script>  <!-- (opcional, se existir) -->
     <script src="js/main.js"></script>  <!-- Lógica principal do chat -->
 </body>
 </html>

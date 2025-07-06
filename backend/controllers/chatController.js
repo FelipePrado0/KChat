@@ -71,19 +71,20 @@ class ChatController {
             }
 
             // Validações básicas
-            if (!group_id || !empresa || !usuario || !mensagem) {
+            if (!group_id || !empresa || !usuario) {
                 console.log('Validação falhou: campos obrigatórios ausentes');
                 return res.status(400).json({
                     success: false,
-                    message: 'Conversa, empresa, usuário e mensagem são obrigatórios'
+                    message: 'Conversa, empresa e usuário são obrigatórios'
                 });
             }
 
-            if (mensagem.trim().length === 0) {
-                console.log('Validação falhou: mensagem vazia');
+            // Permite mensagem vazia se houver arquivo anexado
+            if (!mensagem && !anexoArquivo) {
+                console.log('Validação falhou: mensagem vazia e sem arquivo');
                 return res.status(400).json({
                     success: false,
-                    message: 'Mensagem não pode estar vazia'
+                    message: 'Mensagem ou arquivo é obrigatório'
                 });
             }
 
