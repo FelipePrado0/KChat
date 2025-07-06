@@ -3,9 +3,14 @@
  * Funções auxiliares para o frontend
  */
 
-// Configurações da API
+// ===============================
+// utils.js — Funções auxiliares do frontend KChat
+// Comentários detalhados para facilitar o entendimento de iniciantes
+// ===============================
+
+// Configurações da API (ajuste BASE_URL se necessário)
 const API_CONFIG = {
-    BASE_URL: 'http://localhost:3000/api',
+    BASE_URL: 'http://localhost:3008/api', // URL base do backend
     ENDPOINTS: {
         AUTH: {
             LOGIN: '/auth/login',
@@ -23,7 +28,8 @@ const API_CONFIG = {
 };
 
 /**
- * Classe para gerenciar requisições HTTP
+ * Classe para gerenciar requisições HTTP de forma padronizada
+ * Permite GET, POST, PUT, DELETE e já trata token JWT se necessário
  */
 class ApiClient {
     constructor() {
@@ -31,15 +37,15 @@ class ApiClient {
     }
 
     /**
-     * Fazer requisição HTTP
-     * @param {string} endpoint - Endpoint da API
-     * @param {Object} options - Opções da requisição
-     * @returns {Promise} Promise com a resposta
+     * Faz uma requisição HTTP genérica
+     * @param {string} endpoint - Caminho do endpoint
+     * @param {Object} options - Opções fetch (headers, body, etc)
      */
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
-        const token = this.getToken();
+        const token = this.getToken(); // Busca token salvo (se existir)
 
+        // Headers padrão (JSON + token se existir)
         const defaultOptions = {
             headers: {
                 'Content-Type': 'application/json',
@@ -47,6 +53,7 @@ class ApiClient {
             }
         };
 
+        // Junta opções padrão e customizadas
         const config = {
             ...defaultOptions,
             ...options,
@@ -71,98 +78,52 @@ class ApiClient {
         }
     }
 
-    /**
-     * Requisição GET
-     * @param {string} endpoint - Endpoint da API
-     * @param {Object} params - Parâmetros da query string
-     * @returns {Promise} Promise com a resposta
-     */
+    // Métodos auxiliares para GET, POST, PUT, DELETE
     async get(endpoint, params = {}) {
         const queryString = new URLSearchParams(params).toString();
         const url = queryString ? `${endpoint}?${queryString}` : endpoint;
-        
         return this.request(url, { method: 'GET' });
     }
-
-    /**
-     * Requisição POST
-     * @param {string} endpoint - Endpoint da API
-     * @param {Object} data - Dados para enviar
-     * @returns {Promise} Promise com a resposta
-     */
     async post(endpoint, data = {}) {
         return this.request(endpoint, {
             method: 'POST',
             body: JSON.stringify(data)
         });
     }
-
-    /**
-     * Requisição PUT
-     * @param {string} endpoint - Endpoint da API
-     * @param {Object} data - Dados para enviar
-     * @returns {Promise} Promise com a resposta
-     */
     async put(endpoint, data = {}) {
         return this.request(endpoint, {
             method: 'PUT',
             body: JSON.stringify(data)
         });
     }
-
-    /**
-     * Requisição DELETE
-     * @param {string} endpoint - Endpoint da API
-     * @returns {Promise} Promise com a resposta
-     */
     async delete(endpoint) {
         return this.request(endpoint, { method: 'DELETE' });
     }
 
-    /**
-     * Obter token do localStorage
-     * @returns {string|null} Token JWT
-     */
+    // Métodos para manipular token JWT no localStorage
     getToken() {
         return localStorage.getItem('kchat_token');
     }
-
-    /**
-     * Salvar token no localStorage
-     * @param {string} token - Token JWT
-     */
     setToken(token) {
         localStorage.setItem('kchat_token', token);
     }
-
-    /**
-     * Remover token do localStorage
-     */
     removeToken() {
         localStorage.removeItem('kchat_token');
     }
-
-    /**
-     * Verificar se o usuário está autenticado
-     * @returns {boolean} True se autenticado
-     */
     isAuthenticated() {
         return !!this.getToken();
     }
 }
 
 /**
- * Classe para gerenciar notificações
+ * Classe para mostrar notificações na tela
+ * Usa Bootstrap para estilizar os alerts
  */
 class NotificationManager {
     constructor() {
         this.container = this.createContainer();
     }
-
-    /**
-     * Criar container para notificações
-     * @returns {HTMLElement} Container das notificações
-     */
+    // Cria o container fixo no topo da tela
     createContainer() {
         const container = document.createElement('div');
         container.id = 'notification-container';
@@ -176,13 +137,7 @@ class NotificationManager {
         document.body.appendChild(container);
         return container;
     }
-
-    /**
-     * Mostrar notificação
-     * @param {string} message - Mensagem da notificação
-     * @param {string} type - Tipo da notificação (success, error, warning, info)
-     * @param {number} duration - Duração em milissegundos
-     */
+    // Mostra uma notificação
     show(message, type = 'info', duration = 5000) {
         const notification = document.createElement('div');
         notification.className = `alert alert-${type} alert-dismissible fade show`;
@@ -190,102 +145,55 @@ class NotificationManager {
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
-
         this.container.appendChild(notification);
-
-        // Auto-remover após duração
+        // Remove automaticamente após duration
         if (duration > 0) {
             setTimeout(() => {
                 this.remove(notification);
             }, duration);
         }
-
-        return notification;
     }
-
-    /**
-     * Remover notificação
-     * @param {HTMLElement} notification - Elemento da notificação
-     */
+    // Remove notificação
     remove(notification) {
         if (notification && notification.parentNode) {
             notification.parentNode.removeChild(notification);
         }
     }
-
-    /**
-     * Notificação de sucesso
-     * @param {string} message - Mensagem
-     * @param {number} duration - Duração
-     */
-    success(message, duration = 5000) {
-        return this.show(message, 'success', duration);
-    }
-
-    /**
-     * Notificação de erro
-     * @param {string} message - Mensagem
-     * @param {number} duration - Duração
-     */
-    error(message, duration = 8000) {
-        return this.show(message, 'danger', duration);
-    }
-
-    /**
-     * Notificação de aviso
-     * @param {string} message - Mensagem
-     * @param {number} duration - Duração
-     */
-    warning(message, duration = 6000) {
-        return this.show(message, 'warning', duration);
-    }
-
-    /**
-     * Notificação informativa
-     * @param {string} message - Mensagem
-     * @param {number} duration - Duração
-     */
-    info(message, duration = 5000) {
-        return this.show(message, 'info', duration);
-    }
+    // Atalhos para tipos de notificação
+    success(message, duration = 5000) { this.show(message, 'success', duration); }
+    error(message, duration = 8000) { this.show(message, 'danger', duration); }
+    warning(message, duration = 6000) { this.show(message, 'warning', duration); }
+    info(message, duration = 5000) { this.show(message, 'info', duration); }
 }
 
 /**
- * Classe para gerenciar loading
+ * Classe para mostrar loading/spinner na tela
  */
 class LoadingManager {
     constructor() {
-        this.spinner = document.getElementById('loadingSpinner');
+        this.loadingElement = null;
     }
-
-    /**
-     * Mostrar loading
-     */
+    // Mostra spinner
     show() {
-        if (this.spinner) {
-            this.spinner.classList.remove('d-none');
+        if (!this.loadingElement) {
+            this.loadingElement = document.createElement('div');
+            this.loadingElement.className = 'loading-overlay';
+            this.loadingElement.innerHTML = '<div class="spinner-border text-primary" role="status"></div>';
+            document.body.appendChild(this.loadingElement);
         }
     }
-
-    /**
-     * Ocultar loading
-     */
+    // Esconde spinner
     hide() {
-        if (this.spinner) {
-            this.spinner.classList.add('d-none');
+        if (this.loadingElement) {
+            this.loadingElement.remove();
+            this.loadingElement = null;
         }
     }
-
-    /**
-     * Mostrar loading com callback
-     * @param {Function} callback - Função a executar
-     * @returns {Promise} Promise do callback
-     */
+    // Executa função com loading automático
     async withLoading(callback) {
         this.show();
         try {
-            const result = await callback();
-            return result;
+            await callback();
         } finally {
             this.hide();
         }
@@ -293,235 +201,200 @@ class LoadingManager {
 }
 
 /**
- * Classe para formatação de dados
+ * Classe para formatação de datas, nomes, textos, etc
  */
 class Formatter {
-    /**
-     * Formatar data
-     * @param {string|Date} date - Data para formatar
-     * @param {string} format - Formato desejado
-     * @returns {string} Data formatada
-     */
+    // Formata data para string legível
     static formatDate(date, format = 'datetime') {
         const d = new Date(date);
-        const now = new Date();
-        const diff = now - d;
-        const oneDay = 24 * 60 * 60 * 1000;
-
-        // Se for hoje, mostrar apenas hora
-        if (diff < oneDay && d.toDateString() === now.toDateString()) {
-            return d.toLocaleTimeString('pt-BR', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
+        if (format === 'date') {
+            return d.toLocaleDateString('pt-BR');
+        } else if (format === 'time') {
+            return d.toLocaleTimeString('pt-BR');
+        } else {
+            return d.toLocaleString('pt-BR');
         }
-
-        // Se for ontem
-        if (diff < 2 * oneDay && d.toDateString() === new Date(now - oneDay).toDateString()) {
-            return `Ontem às ${d.toLocaleTimeString('pt-BR', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            })}`;
-        }
-
-        // Se for este ano
-        if (d.getFullYear() === now.getFullYear()) {
-            return d.toLocaleDateString('pt-BR', { 
-                day: '2-digit', 
-                month: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        // Data completa
-        return d.toLocaleDateString('pt-BR', { 
-            day: '2-digit', 
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
     }
-
-    /**
-     * Formatar nome
-     * @param {string} name - Nome para formatar
-     * @returns {string} Nome formatado
-     */
+    // Formata nome (primeira letra maiúscula)
     static formatName(name) {
-        return name
-            .split(' ')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(' ');
+        if (!name) return '';
+        return name.charAt(0).toUpperCase() + name.slice(1);
     }
-
-    /**
-     * Obter iniciais do nome
-     * @param {string} name - Nome
-     * @returns {string} Iniciais
-     */
+    // Retorna as iniciais do nome
     static getInitials(name) {
-        return name
-            .split(' ')
-            .map(word => word.charAt(0).toUpperCase())
-            .slice(0, 2)
-            .join('');
+        if (!name) return '';
+        return name.split(' ').map(n => n[0]).join('').toUpperCase();
     }
-
-    /**
-     * Truncar texto
-     * @param {string} text - Texto para truncar
-     * @param {number} maxLength - Comprimento máximo
-     * @returns {string} Texto truncado
-     */
+    // Limita tamanho do texto
     static truncate(text, maxLength = 50) {
-        if (text.length <= maxLength) return text;
-        return text.substring(0, maxLength) + '...';
+        if (!text) return '';
+        return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
     }
-
-    /**
-     * Escapar HTML
-     * @param {string} text - Texto para escapar
-     * @returns {string} Texto escapado
-     */
+    // Escapa HTML para evitar XSS
     static escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (!text) return '';
+        return text.replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
     }
 }
 
 /**
- * Classe para validação
+ * Classe para validação de dados
  */
 class Validator {
-    /**
-     * Validar email
-     * @param {string} email - Email para validar
-     * @returns {boolean} True se válido
-     */
     static isValidEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
+        return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
     }
-
-    /**
-     * Validar senha
-     * @param {string} password - Senha para validar
-     * @returns {Object} Resultado da validação
-     */
     static validatePassword(password) {
-        const errors = [];
-        
-        if (password.length < 6) {
-            errors.push('Senha deve ter pelo menos 6 caracteres');
-        }
-        
-        if (!/[A-Z]/.test(password)) {
-            errors.push('Senha deve conter pelo menos uma letra maiúscula');
-        }
-        
-        if (!/[a-z]/.test(password)) {
-            errors.push('Senha deve conter pelo menos uma letra minúscula');
-        }
-        
-        if (!/\d/.test(password)) {
-            errors.push('Senha deve conter pelo menos um número');
-        }
-
-        return {
-            isValid: errors.length === 0,
-            errors
-        };
+        return password.length >= 6;
     }
-
-    /**
-     * Validar nome
-     * @param {string} name - Nome para validar
-     * @returns {boolean} True se válido
-     */
     static isValidName(name) {
-        return name.trim().length >= 2;
+        return name && name.length >= 2;
     }
 }
 
 /**
- * Classe para gerenciar localStorage
+ * Classe para manipular dados no localStorage
  */
 class StorageManager {
-    /**
-     * Salvar dados
-     * @param {string} key - Chave
-     * @param {any} value - Valor
-     */
     static set(key, value) {
-        try {
-            localStorage.setItem(key, JSON.stringify(value));
-        } catch (error) {
-            console.error('Erro ao salvar no localStorage:', error);
-        }
+        localStorage.setItem(key, JSON.stringify(value));
     }
-
-    /**
-     * Obter dados
-     * @param {string} key - Chave
-     * @param {any} defaultValue - Valor padrão
-     * @returns {any} Valor salvo
-     */
     static get(key, defaultValue = null) {
-        try {
-            const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : defaultValue;
-        } catch (error) {
-            console.error('Erro ao ler do localStorage:', error);
-            return defaultValue;
-        }
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : defaultValue;
     }
-
-    /**
-     * Remover dados
-     * @param {string} key - Chave
-     */
     static remove(key) {
-        try {
-            localStorage.removeItem(key);
-        } catch (error) {
-            console.error('Erro ao remover do localStorage:', error);
-        }
+        localStorage.removeItem(key);
     }
-
-    /**
-     * Limpar todos os dados
-     */
     static clear() {
-        try {
-            localStorage.clear();
-        } catch (error) {
-            console.error('Erro ao limpar localStorage:', error);
-        }
+        localStorage.clear();
     }
 }
 
 /**
- * Classe para debounce
+ * Classe para debouncing (evita execuções repetidas rápidas)
  */
 class Debouncer {
     constructor(delay = 300) {
         this.delay = delay;
-        this.timeoutId = null;
+        this.timeout = null;
     }
-
-    /**
-     * Executar função com debounce
-     * @param {Function} func - Função a executar
-     * @param {...any} args - Argumentos da função
-     */
     debounce(func, ...args) {
-        clearTimeout(this.timeoutId);
-        this.timeoutId = setTimeout(() => {
-            func.apply(this, args);
-        }, this.delay);
+        clearTimeout(this.timeout);
+        this.timeout = setTimeout(() => func(...args), this.delay);
+    }
+}
+
+// Funções utilitárias avulsas (formatação, validação, etc)
+function formatDate(date) {
+    return Formatter.formatDate(date);
+}
+function formatRelativeDate(date) {
+    // Exemplo: "há 2 horas"
+    const diff = (Date.now() - new Date(date).getTime()) / 1000;
+    if (diff < 60) return 'agora';
+    if (diff < 3600) return `há ${Math.floor(diff/60)} min`;
+    if (diff < 86400) return `há ${Math.floor(diff/3600)} h`;
+    return Formatter.formatDate(date, 'date');
+}
+function isValidUrl(url) {
+    try { new URL(url); return true; } catch { return false; }
+}
+function isValidEmail(email) {
+    return Validator.isValidEmail(email);
+}
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+}
+function throttle(func, limit) {
+    let inThrottle;
+    return function(...args) {
+        if (!inThrottle) {
+            func(...args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch {
+        return false;
+    }
+}
+function generateId() {
+    return '_' + Math.random().toString(36).substr(2, 9);
+}
+function truncateText(text, length = 100) {
+    return Formatter.truncate(text, length);
+}
+function escapeHtml(text) {
+    return Formatter.escapeHtml(text);
+}
+function unescapeHtml(text) {
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    return doc.documentElement.textContent;
+}
+function isElementVisible(element) {
+    if (!element) return false;
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
+}
+function smoothScrollTo(target, duration = 500) {
+    const start = window.scrollY;
+    const change = target - start;
+    let currentTime = 0;
+    const increment = 20;
+    function animation(currentTime) {
+        currentTime += increment;
+        const val = ease(currentTime, start, change, duration);
+        window.scrollTo(0, val);
+        if (currentTime < duration) {
+            setTimeout(() => animation(currentTime), increment);
+        }
+    }
+    function ease(t, b, c, d) {
+        t /= d/2;
+        if (t < 1) return c/2*t*t + b;
+        t--;
+        return -c/2 * (t*(t-2) - 1) + b;
+    }
+    animation(0);
+}
+function isMobile() {
+    return /Mobi|Android/i.test(navigator.userAgent);
+}
+function isOnline() {
+    return navigator.onLine;
+}
+function onConnectivityChange(callback) {
+    window.addEventListener('online', callback);
+    window.addEventListener('offline', callback);
+}
+async function fetchWithTimeout(url, options = {}, timeout = 5000) {
+    return Promise.race([
+        fetch(url, options),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
+    ]);
+}
+async function retry(fn, retries = 3, delay = 1000) {
+    try {
+        return await fn();
+    } catch (err) {
+        if (retries <= 0) throw err;
+        await new Promise(res => setTimeout(res, delay));
+        return retry(fn, retries - 1, delay);
     }
 }
 
