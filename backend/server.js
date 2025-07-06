@@ -1,27 +1,28 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
+// Importa os módulos necessários
+const express = require('express'); // Framework web para Node.js
+const cors = require('cors'); // Middleware para habilitar CORS
+const rateLimit = require('express-rate-limit'); // Middleware para limitar requisições
+const path = require('path'); // Utilitário para lidar com caminhos de arquivos
+const multer = require('multer'); // Middleware para upload de arquivos
 
-// Importar rotas
-const authRoutes = require('./routes/authRoutes');
+// Importa as rotas
+const conversationRoutes = require('./routes/conversationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 
-// Importar utilitários
+// Importa utilitário para inicializar o banco de dados
 const { initializeDatabase } = require('./utils/dbInit');
 
 // Configurações do servidor
-const PORT = process.env.PORT || 3000;
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = process.env.PORT || 3008; // Porta padrão
+const NODE_ENV = process.env.NODE_ENV || 'development'; // Ambiente
 
-// Criar aplicação Express
+// Cria a aplicação Express
 const app = express();
 
-// Configurar rate limiting
+// Configura o rate limiting para evitar abuso da API
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // limite de 100 requisições por IP por janela
+    max: 100, // Limite de 100 requisições por IP
     message: {
         success: false,
         message: 'Muitas requisições deste IP, tente novamente mais tarde.'
@@ -30,43 +31,27 @@ const limiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Middlewares de segurança
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:"],
-        },
-    },
-}));
-
-// Middleware de rate limiting
+// Aplica o rate limiting globalmente
 app.use(limiter);
 
-// Middleware CORS
+// Habilita CORS para origens específicas (frontend)
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://seu-dominio.com'] // Substitua pelo seu domínio em produção
-        : ['http://localhost:5500', 'http://127.0.0.1:5500', 'http://localhost:3000'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5500', 'http://127.0.0.1:5500'],
+    credentials: true
 }));
 
-// Middleware para parsing de JSON
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Permite receber JSON e dados de formulários
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Middleware de logging
+// Middleware de logging: mostra cada requisição no console
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${req.method} ${req.path} - ${req.ip}`);
     next();
 });
 
-// Middleware para tratamento de erros de parsing JSON
+// Middleware para tratar erros de JSON inválido
 app.use((err, req, res, next) => {
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
         return res.status(400).json({
@@ -77,81 +62,65 @@ app.use((err, req, res, next) => {
     next();
 });
 
-// Rotas da API
-app.use('/api/auth', authRoutes);
-app.use('/api/chat', chatRoutes);
+// Servir arquivos estáticos da pasta uploads (anexos)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Rota de health check
+// Registra as rotas principais
+app.use('/api', conversationRoutes); // Rotas de grupos
+app.use('/api/chat', chatRoutes);    // Rotas de mensagens
+
+// Rota de health check (verifica se a API está online)
 app.get('/api/health', (req, res) => {
-    res.status(200).json({
+    res.json({
         success: true,
-        message: 'KChat API está funcionando',
-        timestamp: new Date().toISOString(),
-        environment: NODE_ENV,
-        version: '1.0.0'
+        message: 'KChat API está funcionando!',
+        timestamp: new Date().toISOString()
     });
 });
 
-// Rota raiz
-app.get('/', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'Bem-vindo à API do KChat',
-        version: '1.0.0',
-        endpoints: {
-            auth: '/api/auth',
-            chat: '/api/chat',
-            health: '/api/health'
-        },
-        documentation: 'Consulte a documentação para mais informações'
+// Rota para servir arquivos de upload por nome
+app.get('/api/uploads/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, 'uploads', filename);
+    res.sendFile(filePath);
+});
+
+// Middleware para tratar erros gerais e de upload
+app.use((err, req, res, next) => {
+    console.error('Erro:', err);
+    
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+                success: false,
+                message: 'Arquivo muito grande. Tamanho máximo: 10MB'
+            });
+        }
+    }
+    
+    res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
     });
 });
 
-// Middleware para rotas não encontradas
+// Rota 404 para qualquer rota não encontrada
 app.use('*', (req, res) => {
     res.status(404).json({
         success: false,
-        message: 'Rota não encontrada',
-        path: req.originalUrl
+        message: 'Rota não encontrada'
     });
 });
 
-// Middleware global de tratamento de erros
-app.use((err, req, res, next) => {
-    console.error('Erro não tratado:', err);
-    
-    // Se o erro já foi respondido, não fazer nada
-    if (res.headersSent) {
-        return next(err);
-    }
-
-    // Determinar status code
-    const statusCode = err.statusCode || 500;
-    
-    // Determinar mensagem de erro
-    const message = err.message || 'Erro interno do servidor';
-    
-    // Log do erro em desenvolvimento
-    if (NODE_ENV === 'development') {
-        console.error('Stack trace:', err.stack);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        message: NODE_ENV === 'production' ? 'Erro interno do servidor' : message,
-        ...(NODE_ENV === 'development' && { stack: err.stack })
-    });
-});
-
-// Função para inicializar o servidor
+// Função principal para inicializar o servidor e o banco
 async function startServer() {
     try {
-        // Inicializar banco de dados
+        // Inicializa o banco de dados (cria tabelas se não existirem)
         console.log('Inicializando banco de dados...');
         await initializeDatabase();
         console.log('✓ Banco de dados inicializado');
 
-        // Iniciar servidor
+        // Inicia o servidor Express
         app.listen(PORT, () => {
             console.log('='.repeat(50));
             console.log('🚀 KChat Backend iniciado com sucesso!');
@@ -162,7 +131,6 @@ async function startServer() {
             console.log(`📊 Health Check: http://localhost:${PORT}/api/health`);
             console.log('='.repeat(50));
             console.log('📚 Endpoints disponíveis:');
-            console.log('   🔐 Auth: /api/auth');
             console.log('   💬 Chat: /api/chat');
             console.log('   ❤️  Health: /api/health');
             console.log('='.repeat(50));
@@ -174,7 +142,7 @@ async function startServer() {
     }
 }
 
-// Tratamento de sinais para graceful shutdown
+// Tratamento de sinais para encerramento seguro
 process.on('SIGINT', () => {
     console.log('\n🛑 Recebido SIGINT. Encerrando servidor...');
     process.exit(0);
@@ -196,9 +164,10 @@ process.on('unhandledRejection', (reason, promise) => {
     process.exit(1);
 });
 
-// Iniciar servidor se o arquivo for executado diretamente
+// Inicia o servidor se o arquivo for executado diretamente
 if (require.main === module) {
     startServer();
 }
 
+// Exporta o app para testes ou uso externo
 module.exports = app;

@@ -1,64 +1,112 @@
+// Importa os models necessários para manipular mensagens e conversas
 const MessageModel = require('../models/messageModel');
-const UserModel = require('../models/userModel');
+const ConversationModel = require('../models/conversationModel');
+const multer = require('multer'); // Middleware para upload de arquivos
+const path = require('path'); // Utilitário de caminhos
+const fs = require('fs'); // Sistema de arquivos
 
+// Configuração do multer para upload de arquivos
+const storage = multer.diskStorage({
+    // Define o diretório de upload
+    destination: function (req, file, cb) {
+        const uploadDir = path.join(__dirname, '../uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    // Define o nome do arquivo salvo
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+// Configura o multer com limites e filtros de tipo de arquivo
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // Limite de 10MB por arquivo
+    },
+    fileFilter: function (req, file, cb) {
+        // Permite apenas imagens, documentos e PDFs
+        const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Tipo de arquivo não permitido'));
+        }
+    }
+});
+
+// Controller principal do chat
 class ChatController {
     constructor() {
+        // Instancia o model de mensagens (não é necessário, mas mantido para compatibilidade)
         this.messageModel = new MessageModel();
-        this.userModel = new UserModel();
     }
 
     /**
-     * Enviar nova mensagem
+     * Envia uma nova mensagem para um grupo
      * POST /api/chat/messages
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
      */
     async sendMessage(req, res) {
         try {
-            const { content } = req.body;
-            const userId = req.user.id;
-            const companyId = req.user.company_id;
+            // Extrai dados do corpo da requisição
+            const { conversation_id, empresa, usuario, mensagem, anexo_link } = req.body;
+            let anexoArquivo = null;
+
+            // Se houver arquivo enviado, salva o nome
+            if (req.file) {
+                anexoArquivo = req.file.filename;
+            }
 
             // Validações básicas
-            if (!content) {
+            if (!conversation_id || !empresa || !usuario || !mensagem) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Conteúdo da mensagem é obrigatório'
+                    message: 'Conversa, empresa, usuário e mensagem são obrigatórios'
                 });
             }
 
-            if (content.trim().length === 0) {
+            if (mensagem.trim().length === 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Conteúdo da mensagem não pode estar vazio'
+                    message: 'Mensagem não pode estar vazia'
                 });
             }
 
-            if (content.length > 1000) {
-                return res.status(400).json({
+            // Verifica se a conversa existe
+            const conversationExists = await ConversationModel.exists(conversation_id, empresa);
+            if (!conversationExists) {
+                return res.status(404).json({
                     success: false,
-                    message: 'Mensagem muito longa (máximo 1000 caracteres)'
+                    message: 'Conversa não encontrada'
                 });
             }
 
-            // Criar mensagem
-            const messageData = {
-                content: content.trim(),
-                user_id: userId,
-                company_id: companyId
-            };
+            // Cria a mensagem no banco
+            const message = await MessageModel.create(
+                conversation_id, 
+                empresa, 
+                usuario, 
+                mensagem.trim(),
+                anexo_link || null,
+                anexoArquivo
+            );
 
-            const newMessage = await this.messageModel.create(messageData);
-
+            // Retorna sucesso
             res.status(201).json({
                 success: true,
                 message: 'Mensagem enviada com sucesso',
-                data: {
-                    message: newMessage
-                }
+                data: message
             });
 
         } catch (error) {
+            // Captura e retorna erro
             console.error('Erro ao enviar mensagem:', error);
             res.status(500).json({
                 success: false,
@@ -68,47 +116,38 @@ class ChatController {
     }
 
     /**
-     * Buscar mensagens da empresa (com paginação)
-     * GET /api/chat/messages
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
+     * Lista mensagens de um grupo específico
+     * GET /api/chat/conversations/:conversation_id/messages
      */
-    async getMessages(req, res) {
+    async getMessagesByConversation(req, res) {
         try {
-            const companyId = req.user.company_id;
-            const limit = parseInt(req.query.limit) || 50;
-            const offset = parseInt(req.query.offset) || 0;
+            const { conversation_id } = req.params;
+            const { empresa } = req.query;
 
-            // Validações de paginação
-            if (limit < 1 || limit > 100) {
+            // Validação do parâmetro empresa
+            if (!empresa) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Limite deve estar entre 1 e 100'
+                    message: 'Empresa é obrigatória'
                 });
             }
 
-            if (offset < 0) {
-                return res.status(400).json({
+            // Verifica se a conversa existe
+            const conversationExists = await ConversationModel.exists(conversation_id, empresa);
+            if (!conversationExists) {
+                return res.status(404).json({
                     success: false,
-                    message: 'Offset deve ser maior ou igual a 0'
+                    message: 'Conversa não encontrada'
                 });
             }
 
-            // Buscar mensagens
-            const messages = await this.messageModel.getByCompany(companyId, limit, offset);
-            const totalMessages = await this.messageModel.countByCompany(companyId);
+            // Busca as mensagens do grupo
+            const messages = await MessageModel.findByConversation(conversation_id, empresa);
 
-            res.status(200).json({
+            // Retorna as mensagens
+            res.json({
                 success: true,
-                data: {
-                    messages,
-                    pagination: {
-                        limit,
-                        offset,
-                        total: totalMessages,
-                        hasMore: offset + limit < totalMessages
-                    }
-                }
+                data: messages
             });
 
         } catch (error) {
@@ -121,36 +160,46 @@ class ChatController {
     }
 
     /**
-     * Buscar mensagens mais recentes
-     * GET /api/chat/messages/recent
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
+     * Edita uma mensagem existente
+     * PUT /api/chat/messages/:id
      */
-    async getRecentMessages(req, res) {
+    async editMessage(req, res) {
         try {
-            const companyId = req.user.company_id;
-            const limit = parseInt(req.query.limit) || 20;
+            const { id } = req.params;
+            const { empresa, nova_mensagem } = req.body;
 
-            // Validação de limite
-            if (limit < 1 || limit > 50) {
+            // Validações
+            if (!empresa || !nova_mensagem) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Limite deve estar entre 1 e 50'
+                    message: 'Empresa e nova mensagem são obrigatórios'
                 });
             }
 
-            // Buscar mensagens recentes
-            const messages = await this.messageModel.getRecentByCompany(companyId, limit);
+            if (nova_mensagem.trim().length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Mensagem não pode estar vazia'
+                });
+            }
 
-            res.status(200).json({
+            // Atualiza a mensagem no banco
+            const updated = await MessageModel.update(id, empresa, nova_mensagem.trim());
+
+            if (!updated) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Mensagem não encontrada'
+                });
+            }
+
+            res.json({
                 success: true,
-                data: {
-                    messages
-                }
+                message: 'Mensagem editada com sucesso'
             });
 
         } catch (error) {
-            console.error('Erro ao buscar mensagens recentes:', error);
+            console.error('Erro ao editar mensagem:', error);
             res.status(500).json({
                 success: false,
                 message: 'Erro interno do servidor'
@@ -159,25 +208,99 @@ class ChatController {
     }
 
     /**
-     * Buscar mensagem específica
-     * GET /api/chat/messages/:messageId
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
+     * Deleta (marca como deletada) uma mensagem
+     * DELETE /api/chat/messages/:id
      */
-    async getMessage(req, res) {
+    async deleteMessage(req, res) {
         try {
-            const messageId = parseInt(req.params.messageId);
-            const companyId = req.user.company_id;
+            const { id } = req.params;
+            const { empresa } = req.body;
 
-            if (!messageId || messageId <= 0) {
+            // Validação
+            if (!empresa) {
                 return res.status(400).json({
                     success: false,
-                    message: 'ID da mensagem inválido'
+                    message: 'Empresa é obrigatória'
                 });
             }
 
-            // Buscar mensagem
-            const message = await this.messageModel.getById(messageId, companyId);
+            // Marca a mensagem como deletada
+            const deleted = await MessageModel.delete(id, empresa);
+
+            if (!deleted) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Mensagem não encontrada'
+                });
+            }
+
+            res.json({
+                success: true,
+                message: 'Mensagem deletada com sucesso'
+            });
+
+        } catch (error) {
+            console.error('Erro ao deletar mensagem:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Erro interno do servidor'
+            });
+        }
+    }
+
+    /**
+     * Lista todas as mensagens de uma empresa
+     * GET /api/chat/messages/empresa/:empresa
+     */
+    async getMessagesByEmpresa(req, res) {
+        try {
+            const { empresa } = req.params;
+            const { limit } = req.query;
+
+            // Validação
+            if (!empresa) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Empresa é obrigatória'
+                });
+            }
+
+            // Busca as mensagens da empresa
+            const messages = await MessageModel.findByEmpresa(empresa, parseInt(limit) || 100);
+
+            res.json({
+                success: true,
+                data: messages
+            });
+
+        } catch (error) {
+            console.error('Erro ao buscar mensagens:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Erro interno do servidor'
+            });
+        }
+    }
+
+    /**
+     * Busca uma mensagem específica por ID
+     * GET /api/chat/messages/:id
+     */
+    async getMessageById(req, res) {
+        try {
+            const { id } = req.params;
+            const { empresa } = req.query;
+
+            // Validação
+            if (!empresa) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Empresa é obrigatória'
+                });
+            }
+
+            // Busca a mensagem
+            const message = await MessageModel.findById(id, empresa);
 
             if (!message) {
                 return res.status(404).json({
@@ -186,11 +309,9 @@ class ChatController {
                 });
             }
 
-            res.status(200).json({
+            res.json({
                 success: true,
-                data: {
-                    message
-                }
+                data: message
             });
 
         } catch (error) {
@@ -203,288 +324,12 @@ class ChatController {
     }
 
     /**
-     * Atualizar mensagem
-     * PUT /api/chat/messages/:messageId
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
+     * Middleware para upload de arquivo (usado nas rotas de envio de mensagem)
      */
-    async updateMessage(req, res) {
-        try {
-            const messageId = parseInt(req.params.messageId);
-            const { content } = req.body;
-            const userId = req.user.id;
-            const companyId = req.user.company_id;
-
-            // Validações básicas
-            if (!content) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Conteúdo da mensagem é obrigatório'
-                });
-            }
-
-            if (content.trim().length === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Conteúdo da mensagem não pode estar vazio'
-                });
-            }
-
-            if (content.length > 1000) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Mensagem muito longa (máximo 1000 caracteres)'
-                });
-            }
-
-            // Atualizar mensagem
-            const updateData = { content: content.trim() };
-            const updatedMessage = await this.messageModel.update(messageId, userId, companyId, updateData);
-
-            res.status(200).json({
-                success: true,
-                message: 'Mensagem atualizada com sucesso',
-                data: {
-                    message: updatedMessage
-                }
-            });
-
-        } catch (error) {
-            console.error('Erro ao atualizar mensagem:', error);
-            
-            if (error.message.includes('não encontrada') || error.message.includes('sem permissão')) {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message
-                });
-            }
-
-            res.status(500).json({
-                success: false,
-                message: 'Erro interno do servidor'
-            });
-        }
-    }
-
-    /**
-     * Deletar mensagem
-     * DELETE /api/chat/messages/:messageId
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
-     */
-    async deleteMessage(req, res) {
-        try {
-            const messageId = parseInt(req.params.messageId);
-            const userId = req.user.id;
-            const companyId = req.user.company_id;
-
-            // Deletar mensagem
-            const deleted = await this.messageModel.delete(messageId, userId, companyId);
-
-            if (!deleted) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Mensagem não encontrada ou sem permissão para deletar'
-                });
-            }
-
-            res.status(200).json({
-                success: true,
-                message: 'Mensagem deletada com sucesso'
-            });
-
-        } catch (error) {
-            console.error('Erro ao deletar mensagem:', error);
-            
-            if (error.message.includes('não encontrada') || error.message.includes('sem permissão')) {
-                return res.status(404).json({
-                    success: false,
-                    message: error.message
-                });
-            }
-
-            res.status(500).json({
-                success: false,
-                message: 'Erro interno do servidor'
-            });
-        }
-    }
-
-    /**
-     * Buscar mensagens por usuário
-     * GET /api/chat/messages/user/:userId
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
-     */
-    async getUserMessages(req, res) {
-        try {
-            const targetUserId = parseInt(req.params.userId);
-            const companyId = req.user.company_id;
-            const limit = parseInt(req.query.limit) || 50;
-            const offset = parseInt(req.query.offset) || 0;
-
-            // Validações
-            if (!targetUserId || targetUserId <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'ID do usuário inválido'
-                });
-            }
-
-            if (limit < 1 || limit > 100) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Limite deve estar entre 1 e 100'
-                });
-            }
-
-            if (offset < 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Offset deve ser maior ou igual a 0'
-                });
-            }
-
-            // Verificar se o usuário pertence à mesma empresa
-            const targetUser = await this.userModel.getById(targetUserId);
-            if (!targetUser || targetUser.company_id !== companyId) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Usuário não encontrado'
-                });
-            }
-
-            // Buscar mensagens do usuário
-            const messages = await this.messageModel.getByUser(targetUserId, companyId, limit, offset);
-
-            res.status(200).json({
-                success: true,
-                data: {
-                    messages,
-                    user: {
-                        id: targetUser.id,
-                        name: targetUser.name,
-                        email: targetUser.email
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error('Erro ao buscar mensagens do usuário:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Erro interno do servidor'
-            });
-        }
-    }
-
-    /**
-     * Buscar mensagens por período
-     * GET /api/chat/messages/date-range
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
-     */
-    async getMessagesByDateRange(req, res) {
-        try {
-            const companyId = req.user.company_id;
-            const { startDate, endDate } = req.query;
-
-            // Validações
-            if (!startDate || !endDate) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Data inicial e final são obrigatórias'
-                });
-            }
-
-            // Validar formato das datas (YYYY-MM-DD)
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Formato de data inválido (use YYYY-MM-DD)'
-                });
-            }
-
-            // Validar se startDate <= endDate
-            if (new Date(startDate) > new Date(endDate)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Data inicial deve ser menor ou igual à data final'
-                });
-            }
-
-            // Buscar mensagens por período
-            const messages = await this.messageModel.getByDateRange(companyId, startDate, endDate);
-
-            res.status(200).json({
-                success: true,
-                data: {
-                    messages,
-                    dateRange: {
-                        startDate,
-                        endDate
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error('Erro ao buscar mensagens por período:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Erro interno do servidor'
-            });
-        }
-    }
-
-    /**
-     * Buscar estatísticas do chat
-     * GET /api/chat/stats
-     * @param {Object} req - Request object
-     * @param {Object} res - Response object
-     */
-    async getChatStats(req, res) {
-        try {
-            const companyId = req.user.company_id;
-
-            // Contar mensagens totais
-            const totalMessages = await this.messageModel.countByCompany(companyId);
-
-            // Buscar usuários da empresa
-            const users = await this.userModel.getByCompany(companyId);
-
-            // Buscar mensagens dos últimos 7 dias
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            const startDate = sevenDaysAgo.toISOString().split('T')[0];
-            const endDate = new Date().toISOString().split('T')[0];
-            
-            const recentMessages = await this.messageModel.getByDateRange(companyId, startDate, endDate);
-
-            res.status(200).json({
-                success: true,
-                data: {
-                    stats: {
-                        totalMessages,
-                        totalUsers: users.length,
-                        messagesLast7Days: recentMessages.length
-                    },
-                    users: users.map(user => ({
-                        id: user.id,
-                        name: user.name,
-                        email: user.email
-                    }))
-                }
-            });
-
-        } catch (error) {
-            console.error('Erro ao buscar estatísticas:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Erro interno do servidor'
-            });
-        }
+    uploadMiddleware() {
+        return upload.single('anexo_arquivo');
     }
 }
 
+// Exporta o controller para uso nas rotas
 module.exports = ChatController;

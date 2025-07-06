@@ -1,112 +1,36 @@
+// Importa o framework Express
 const express = require('express');
 const router = express.Router();
+// Importa o controller do chat
 const ChatController = require('../controllers/chatController');
-const { authenticateToken, verifyMessageOwnership } = require('../middleware/authMiddleware');
 
-// Instanciar controlador
+// Instancia o controller do chat
 const chatController = new ChatController();
 
-// Middleware de autenticação para todas as rotas de chat
-router.use(authenticateToken);
+// Rota para enviar mensagem (suporta upload de arquivo)
+// POST /api/chat/messages
+// Usa o middleware de upload e depois chama o método de envio
+router.post('/messages', chatController.uploadMiddleware(), chatController.sendMessage.bind(chatController));
 
-/**
- * @route   POST /api/chat/messages
- * @desc    Enviar nova mensagem
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @body    { content }
- */
-router.post('/messages', async (req, res) => {
-    await chatController.sendMessage(req, res);
-});
+// Rota para listar mensagens de um grupo
+// GET /api/chat/conversations/:conversation_id/messages?empresa=XXX
+router.get('/conversations/:conversation_id/messages', chatController.getMessagesByConversation.bind(chatController));
 
-/**
- * @route   GET /api/chat/messages
- * @desc    Buscar mensagens da empresa (com paginação)
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @query   { limit?, offset? }
- */
-router.get('/messages', async (req, res) => {
-    await chatController.getMessages(req, res);
-});
+// Rota para editar uma mensagem
+// PUT /api/chat/messages/:id
+router.put('/messages/:id', chatController.editMessage.bind(chatController));
 
-/**
- * @route   GET /api/chat/messages/recent
- * @desc    Buscar mensagens mais recentes
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @query   { limit? }
- */
-router.get('/messages/recent', async (req, res) => {
-    await chatController.getRecentMessages(req, res);
-});
+// Rota para deletar (marcar como deletada) uma mensagem
+// DELETE /api/chat/messages/:id
+router.delete('/messages/:id', chatController.deleteMessage.bind(chatController));
 
-/**
- * @route   GET /api/chat/messages/:messageId
- * @desc    Buscar mensagem específica
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @param   { messageId }
- */
-router.get('/messages/:messageId', async (req, res) => {
-    await chatController.getMessage(req, res);
-});
+// Rota para listar todas as mensagens de uma empresa
+// GET /api/chat/messages/empresa/:empresa
+router.get('/messages/empresa/:empresa', chatController.getMessagesByEmpresa.bind(chatController));
 
-/**
- * @route   PUT /api/chat/messages/:messageId
- * @desc    Atualizar mensagem (apenas pelo autor)
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @param   { messageId }
- * @body    { content }
- */
-router.put('/messages/:messageId', verifyMessageOwnership, async (req, res) => {
-    await chatController.updateMessage(req, res);
-});
+// Rota para buscar uma mensagem por ID
+// GET /api/chat/messages/:id
+router.get('/messages/:id', chatController.getMessageById.bind(chatController));
 
-/**
- * @route   DELETE /api/chat/messages/:messageId
- * @desc    Deletar mensagem (apenas pelo autor)
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @param   { messageId }
- */
-router.delete('/messages/:messageId', verifyMessageOwnership, async (req, res) => {
-    await chatController.deleteMessage(req, res);
-});
-
-/**
- * @route   GET /api/chat/messages/user/:userId
- * @desc    Buscar mensagens por usuário (dentro da mesma empresa)
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @param   { userId }
- * @query   { limit?, offset? }
- */
-router.get('/messages/user/:userId', async (req, res) => {
-    await chatController.getUserMessages(req, res);
-});
-
-/**
- * @route   GET /api/chat/messages/date-range
- * @desc    Buscar mensagens por período
- * @access  Private
- * @header  Authorization: Bearer <token>
- * @query   { startDate, endDate }
- */
-router.get('/messages/date-range', async (req, res) => {
-    await chatController.getMessagesByDateRange(req, res);
-});
-
-/**
- * @route   GET /api/chat/stats
- * @desc    Buscar estatísticas do chat
- * @access  Private
- * @header  Authorization: Bearer <token>
- */
-router.get('/stats', async (req, res) => {
-    await chatController.getChatStats(req, res);
-});
-
+// Exporta o router para uso no server.js
 module.exports = router;

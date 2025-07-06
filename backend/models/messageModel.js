@@ -1,295 +1,187 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+// Importa a conexão com o banco de dados SQLite
+const { db } = require('../utils/dbInit');
 
-// Caminho para o banco de dados
-const dbPath = path.join(__dirname, '../db/database.sqlite');
-
+// Model para manipulação de mensagens
 class MessageModel {
-    constructor() {
-        this.db = new sqlite3.Database(dbPath);
-    }
-
     /**
-     * Criar uma nova mensagem
-     * @param {Object} messageData - Dados da mensagem
-     * @param {string} messageData.content - Conteúdo da mensagem
-     * @param {number} messageData.user_id - ID do usuário que enviou
-     * @param {number} messageData.company_id - ID da empresa
-     * @returns {Promise<Object>} Mensagem criada
+     * Cria uma nova mensagem no banco
+     * @param {number} conversationId - ID do grupo
+     * @param {string} empresa - Nome da empresa
+     * @param {string} usuario - Nome do usuário
+     * @param {string} mensagem - Texto da mensagem
+     * @param {string|null} anexoLink - Link opcional
+     * @param {string|null} anexoArquivo - Nome do arquivo opcional
      */
-    async create(messageData) {
+    static async create(conversationId, empresa, usuario, mensagem, anexoLink = null, anexoArquivo = null) {
         return new Promise((resolve, reject) => {
             const query = `
-                INSERT INTO messages (content, user_id, company_id)
-                VALUES (?, ?, ?)
+                INSERT INTO messages (conversation_id, empresa, usuario, mensagem, anexo_link, anexo_arquivo) 
+                VALUES (?, ?, ?, ?, ?, ?)
             `;
-            
-            this.db.run(query, [messageData.content, messageData.user_id, messageData.company_id], function(err) {
+            // Executa o insert no banco
+            db.run(query, [conversationId, empresa, usuario, mensagem, anexoLink, anexoArquivo], function(err) {
                 if (err) {
-                    return reject(err);
+                    reject(err);
+                } else {
+                    // Retorna o objeto da mensagem criada
+                    resolve({
+                        id: this.lastID,
+                        conversation_id: conversationId,
+                        empresa,
+                        usuario,
+                        mensagem,
+                        anexo_link: anexoLink,
+                        anexo_arquivo: anexoArquivo,
+                        hora: new Date().toISOString(),
+                        editada: false,
+                        deletada: false,
+                        criado_em: new Date().toISOString()
+                    });
                 }
-                
-                // Retornar mensagem criada
-                this.getById(this.lastID)
-                    .then(message => resolve(message))
-                    .catch(reject);
-            }.bind(this));
+            });
         });
     }
 
     /**
-     * Buscar mensagem por ID (com verificação de empresa)
+     * Lista todas as mensagens de um grupo
+     * @param {number} conversationId - ID do grupo
+     * @param {string} empresa - Nome da empresa
+     */
+    static async findByConversation(conversationId, empresa) {
+        return new Promise((resolve, reject) => {
+            const query = `
+                SELECT * FROM messages 
+                WHERE conversation_id = ? AND empresa = ? AND deletada = 0
+                ORDER BY hora ASC
+            `;
+            // Busca todas as mensagens do grupo
+            db.all(query, [conversationId, empresa], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+    }
+
+    /**
+     * Busca uma mensagem por ID
      * @param {number} id - ID da mensagem
-     * @param {number} companyId - ID da empresa para verificação
-     * @returns {Promise<Object|null>} Mensagem encontrada ou null
+     * @param {string} empresa - Nome da empresa
      */
-    async getById(id, companyId) {
+    static async findById(id, empresa) {
         return new Promise((resolve, reject) => {
             const query = `
-                SELECT m.id, m.content, m.user_id, m.company_id, m.created_at, m.updated_at,
-                       u.name as user_name, u.email as user_email,
-                       c.name as company_name
-                FROM messages m
-                JOIN users u ON m.user_id = u.id
-                JOIN companies c ON m.company_id = c.id
-                WHERE m.id = ? AND m.company_id = ?
+                SELECT * FROM messages 
+                WHERE id = ? AND empresa = ?
             `;
-            
-            this.db.get(query, [id, companyId], (err, row) => {
+            // Busca a mensagem pelo ID
+            db.get(query, [id, empresa], (err, row) => {
                 if (err) {
-                    return reject(err);
+                    reject(err);
+                } else {
+                    resolve(row);
                 }
-                resolve(row || null);
             });
         });
     }
 
     /**
-     * Buscar mensagens por empresa (com paginação)
-     * @param {number} companyId - ID da empresa
-     * @param {number} limit - Limite de mensagens por página
-     * @param {number} offset - Offset para paginação
-     * @returns {Promise<Array>} Lista de mensagens da empresa
+     * Edita o texto de uma mensagem
+     * @param {number} id - ID da mensagem
+     * @param {string} empresa - Nome da empresa
+     * @param {string} novaMensagem - Novo texto
      */
-    async getByCompany(companyId, limit = 50, offset = 0) {
+    static async update(id, empresa, novaMensagem) {
         return new Promise((resolve, reject) => {
             const query = `
-                SELECT m.id, m.content, m.user_id, m.company_id, m.created_at, m.updated_at,
-                       u.name as user_name, u.email as user_email,
-                       c.name as company_name
-                FROM messages m
-                JOIN users u ON m.user_id = u.id
-                JOIN companies c ON m.company_id = c.id
-                WHERE m.company_id = ?
-                ORDER BY m.created_at DESC
-                LIMIT ? OFFSET ?
+                UPDATE messages 
+                SET mensagem = ?, editada = 1 
+                WHERE id = ? AND empresa = ?
             `;
-            
-            this.db.all(query, [companyId, limit, offset], (err, rows) => {
+            // Atualiza a mensagem no banco
+            db.run(query, [novaMensagem, id, empresa], function(err) {
                 if (err) {
-                    return reject(err);
+                    reject(err);
+                } else {
+                    resolve(this.changes > 0); // true se alguma linha foi alterada
                 }
-                resolve(rows || []);
             });
         });
     }
 
     /**
-     * Buscar mensagens mais recentes por empresa
-     * @param {number} companyId - ID da empresa
+     * Marca uma mensagem como deletada
+     * @param {number} id - ID da mensagem
+     * @param {string} empresa - Nome da empresa
+     */
+    static async delete(id, empresa) {
+        return new Promise((resolve, reject) => {
+            const query = `
+                UPDATE messages 
+                SET deletada = 1 
+                WHERE id = ? AND empresa = ?
+            `;
+            // Marca a mensagem como deletada
+            db.run(query, [id, empresa], function(err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(this.changes > 0); // true se alguma linha foi alterada
+                }
+            });
+        });
+    }
+
+    /**
+     * Lista todas as mensagens de uma empresa (de todos os grupos)
+     * @param {string} empresa - Nome da empresa
      * @param {number} limit - Limite de mensagens
-     * @returns {Promise<Array>} Lista das mensagens mais recentes
      */
-    async getRecentByCompany(companyId, limit = 20) {
+    static async findByEmpresa(empresa, limit = 100) {
         return new Promise((resolve, reject) => {
             const query = `
-                SELECT m.id, m.content, m.user_id, m.company_id, m.created_at, m.updated_at,
-                       u.name as user_name, u.email as user_email,
-                       c.name as company_name
+                SELECT m.*, c.nome_grupo 
                 FROM messages m
-                JOIN users u ON m.user_id = u.id
-                JOIN companies c ON m.company_id = c.id
-                WHERE m.company_id = ?
-                ORDER BY m.created_at DESC
+                JOIN conversations c ON m.conversation_id = c.id
+                WHERE m.empresa = ? AND m.deletada = 0
+                ORDER BY m.hora DESC
                 LIMIT ?
             `;
-            
-            this.db.all(query, [companyId, limit], (err, rows) => {
+            // Busca as mensagens da empresa
+            db.all(query, [empresa, limit], (err, rows) => {
                 if (err) {
-                    return reject(err);
+                    reject(err);
+                } else {
+                    resolve(rows);
                 }
-                resolve(rows || []);
             });
         });
     }
 
     /**
-     * Buscar mensagens por usuário (dentro da mesma empresa)
-     * @param {number} userId - ID do usuário
-     * @param {number} companyId - ID da empresa
-     * @param {number} limit - Limite de mensagens
-     * @param {number} offset - Offset para paginação
-     * @returns {Promise<Array>} Lista de mensagens do usuário
+     * Conta o número de mensagens de um grupo
+     * @param {number} conversationId - ID do grupo
+     * @param {string} empresa - Nome da empresa
      */
-    async getByUser(userId, companyId, limit = 50, offset = 0) {
+    static async countByConversation(conversationId, empresa) {
         return new Promise((resolve, reject) => {
             const query = `
-                SELECT m.id, m.content, m.user_id, m.company_id, m.created_at, m.updated_at,
-                       u.name as user_name, u.email as user_email,
-                       c.name as company_name
-                FROM messages m
-                JOIN users u ON m.user_id = u.id
-                JOIN companies c ON m.company_id = c.id
-                WHERE m.user_id = ? AND m.company_id = ?
-                ORDER BY m.created_at DESC
-                LIMIT ? OFFSET ?
+                SELECT COUNT(*) as count FROM messages 
+                WHERE conversation_id = ? AND empresa = ? AND deletada = 0
             `;
-            
-            this.db.all(query, [userId, companyId, limit, offset], (err, rows) => {
+            // Conta as mensagens do grupo
+            db.get(query, [conversationId, empresa], (err, row) => {
                 if (err) {
-                    return reject(err);
+                    reject(err);
+                } else {
+                    resolve(row.count);
                 }
-                resolve(rows || []);
             });
         });
-    }
-
-    /**
-     * Atualizar mensagem (apenas pelo autor)
-     * @param {number} id - ID da mensagem
-     * @param {number} userId - ID do usuário que está editando
-     * @param {number} companyId - ID da empresa
-     * @param {Object} updateData - Dados para atualizar
-     * @returns {Promise<Object>} Mensagem atualizada
-     */
-    async update(id, userId, companyId, updateData) {
-        return new Promise((resolve, reject) => {
-            // Primeiro verificar se a mensagem pertence ao usuário e à empresa
-            const verifyQuery = `
-                SELECT id FROM messages 
-                WHERE id = ? AND user_id = ? AND company_id = ?
-            `;
-            
-            this.db.get(verifyQuery, [id, userId, companyId], (err, row) => {
-                if (err) {
-                    return reject(err);
-                }
-                
-                if (!row) {
-                    return reject(new Error('Mensagem não encontrada ou sem permissão para editar'));
-                }
-                
-                // Atualizar mensagem
-                const updateQuery = `
-                    UPDATE messages 
-                    SET content = ?, updated_at = CURRENT_TIMESTAMP 
-                    WHERE id = ?
-                `;
-                
-                this.db.run(updateQuery, [updateData.content, id], function(err) {
-                    if (err) {
-                        return reject(err);
-                    }
-                    
-                    this.getById(id, companyId)
-                        .then(message => resolve(message))
-                        .catch(reject);
-                }.bind(this));
-            });
-        });
-    }
-
-    /**
-     * Deletar mensagem (apenas pelo autor)
-     * @param {number} id - ID da mensagem
-     * @param {number} userId - ID do usuário que está deletando
-     * @param {number} companyId - ID da empresa
-     * @returns {Promise<boolean>} True se deletado com sucesso
-     */
-    async delete(id, userId, companyId) {
-        return new Promise((resolve, reject) => {
-            // Primeiro verificar se a mensagem pertence ao usuário e à empresa
-            const verifyQuery = `
-                SELECT id FROM messages 
-                WHERE id = ? AND user_id = ? AND company_id = ?
-            `;
-            
-            this.db.get(verifyQuery, [id, userId, companyId], (err, row) => {
-                if (err) {
-                    return reject(err);
-                }
-                
-                if (!row) {
-                    return reject(new Error('Mensagem não encontrada ou sem permissão para deletar'));
-                }
-                
-                // Deletar mensagem
-                const deleteQuery = 'DELETE FROM messages WHERE id = ?';
-                
-                this.db.run(deleteQuery, [id], function(err) {
-                    if (err) {
-                        return reject(err);
-                    }
-                    resolve(this.changes > 0);
-                });
-            });
-        });
-    }
-
-    /**
-     * Contar mensagens por empresa
-     * @param {number} companyId - ID da empresa
-     * @returns {Promise<number>} Número total de mensagens
-     */
-    async countByCompany(companyId) {
-        return new Promise((resolve, reject) => {
-            const query = 'SELECT COUNT(*) as count FROM messages WHERE company_id = ?';
-            
-            this.db.get(query, [companyId], (err, row) => {
-                if (err) {
-                    return reject(err);
-                }
-                resolve(row.count);
-            });
-        });
-    }
-
-    /**
-     * Buscar mensagens por data (dentro da empresa)
-     * @param {number} companyId - ID da empresa
-     * @param {string} startDate - Data inicial (YYYY-MM-DD)
-     * @param {string} endDate - Data final (YYYY-MM-DD)
-     * @returns {Promise<Array>} Lista de mensagens no período
-     */
-    async getByDateRange(companyId, startDate, endDate) {
-        return new Promise((resolve, reject) => {
-            const query = `
-                SELECT m.id, m.content, m.user_id, m.company_id, m.created_at, m.updated_at,
-                       u.name as user_name, u.email as user_email,
-                       c.name as company_name
-                FROM messages m
-                JOIN users u ON m.user_id = u.id
-                JOIN companies c ON m.company_id = c.id
-                WHERE m.company_id = ? 
-                AND DATE(m.created_at) BETWEEN ? AND ?
-                ORDER BY m.created_at DESC
-            `;
-            
-            this.db.all(query, [companyId, startDate, endDate], (err, rows) => {
-                if (err) {
-                    return reject(err);
-                }
-                resolve(rows || []);
-            });
-        });
-    }
-
-    /**
-     * Fechar conexão com o banco
-     */
-    close() {
-        this.db.close();
     }
 }
 
+// Exporta o model para uso nos controllers
 module.exports = MessageModel;
