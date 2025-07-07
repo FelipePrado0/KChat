@@ -4,6 +4,12 @@ const cors = require('cors'); // Middleware para habilitar CORS
 const rateLimit = require('express-rate-limit'); // Middleware para limitar requisições
 const path = require('path'); // Utilitário para lidar com caminhos de arquivos
 const multer = require('multer'); // Middleware para upload de arquivos
+const http = require('http'); // Adiciona o módulo http
+const { Server } = require('socket.io'); // Importa o socket.io
+const { Boom } = require('@hapi/boom');
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode');
+const fs = require('fs');
 
 // Importa as rotas
 const chatRoutes = require('./routes/chatRoutes');
@@ -155,6 +161,65 @@ app.use('*', (req, res) => {
     });
 });
 
+// Cria o servidor HTTP e integra com o Express
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*', // Permite qualquer origem (ajuste para produção)
+        methods: ['GET', 'POST']
+    }
+});
+
+// === INTEGRAÇÃO BAILEYS (WhatsApp) ===
+let sock;
+let isReady = false;
+(async () => {
+    const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'baileys_auth'));
+    const { version } = await fetchLatestBaileysVersion();
+    sock = makeWASocket({
+        version,
+        printQRInTerminal: false,
+        auth: state,
+        syncFullHistory: false,
+        getMessage: async () => undefined
+    });
+    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        if (qr) {
+            // Emite o QR Code para o frontend via Socket.io
+            io.emit('qr', qr);
+            // (Opcional) Salva QR como imagem para debug
+            qrcode.toFile(path.join(__dirname, 'last_qr.png'), qr, { width: 256 }, (err) => {
+                if (err) console.error('Erro ao salvar QR:', err);
+            });
+        }
+        if (connection === 'open') {
+            isReady = true;
+            console.log('✅ Conectado ao WhatsApp via Baileys!');
+        } else if (connection === 'close') {
+            isReady = false;
+            const reason = lastDisconnect?.error instanceof Boom ? lastDisconnect.error.output.statusCode : lastDisconnect?.error;
+            console.log('🔌 Conexão WhatsApp fechada:', reason);
+        }
+    });
+})();
+
+// Evento de conexão do socket
+io.on('connection', (socket) => {
+    console.log('Novo usuário conectado:', socket.id);
+
+    // Recebe mensagem do cliente e repassa para todos
+    socket.on('nova_mensagem', (mensagem) => {
+        // Aqui você pode salvar no banco se quiser
+        io.emit('mensagem_recebida', mensagem); // Envia para todos conectados
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Usuário desconectado:', socket.id);
+    });
+});
+
 // Função principal para inicializar o servidor e o banco
 async function startServer() {
     try {
@@ -163,8 +228,8 @@ async function startServer() {
         await initializeDatabase();
         console.log('✓ Banco de dados inicializado');
 
-        // Inicia o servidor Express
-        app.listen(PORT, () => {
+        // Inicia o servidor HTTP com socket.io
+        server.listen(PORT, () => {
             console.log('='.repeat(50));
             console.log('🚀 KChat Backend iniciado com sucesso!');
             console.log('='.repeat(50));
@@ -177,6 +242,7 @@ async function startServer() {
             console.log('   💬 Chat: /api/chat');
             console.log('   ❤️  Health: /api/health');
             console.log('='.repeat(50));
+            console.log('💡 Socket.io ativo para chat em tempo real!');
         });
 
     } catch (error) {

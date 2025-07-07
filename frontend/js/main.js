@@ -124,6 +124,36 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     // --- Fim áudio ---
+
+    // === INTEGRAÇÃO SOCKET.IO ===
+    // Adiciona o script do socket.io dinamicamente se não estiver presente
+    (function loadSocketIoScript() {
+        if (!window.io) {
+            const script = document.createElement('script');
+            script.src = 'http://localhost:3000/socket.io/socket.io.js';
+            script.onload = setupSocketIo;
+            document.head.appendChild(script);
+        } else {
+            setupSocketIo();
+        }
+    })();
+
+    let socket;
+    function setupSocketIo() {
+        socket = io('http://localhost:3000');
+        console.log('🔌 Socket.io conectado:', socket.id);
+
+        // Recebe mensagem em tempo real
+        socket.on('mensagem_recebida', (mensagem) => {
+            console.log('📥 Nova mensagem recebida via socket:', mensagem);
+            // Se a mensagem for do grupo/conversa atual, exibe imediatamente
+            if (appState.currentGroup && mensagem.group_id === appState.currentGroup.id) {
+                appState.messages.push(mensagem);
+                displayMessages(appState.messages);
+            }
+            // (Opcional) Adapte para mensagens privadas se necessário
+        });
+    }
 });
 
 // Função para alternar exibição do painel fixo do chat
@@ -832,6 +862,18 @@ async function sendGroupMessage(messageInput, fileInput) {
     } catch (error) {
         console.error('❌ [sendGroupMessage] Erro ao enviar mensagem:', error);
         showAlert('Erro ao enviar mensagem', 'danger');
+    }
+
+    // Emite via socket para atualização em tempo real
+    if (window.socket) {
+        const mensagem = {
+            group_id: appState.currentGroup.id,
+            empresa: CONFIG.EMPRESA,
+            usuario: CONFIG.USUARIO,
+            mensagem: messageInput.value,
+            data_envio: new Date().toISOString()
+        };
+        window.socket.emit('nova_mensagem', mensagem);
     }
 }
 

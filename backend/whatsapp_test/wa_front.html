@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Teste WhatsApp API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f7f7f7; }
+        .container { background: #fff; padding: 24px; border-radius: 8px; max-width: 500px; margin: auto; box-shadow: 0 2px 8px #0001; }
+        h2 { text-align: center; }
+        label { display: block; margin-top: 16px; }
+        input, textarea { width: 100%; padding: 8px; margin-top: 4px; border-radius: 4px; border: 1px solid #ccc; }
+        button { margin-top: 16px; padding: 10px 20px; border: none; border-radius: 4px; background: #25d366; color: #fff; font-size: 16px; cursor: pointer; }
+        button:hover { background: #128c7e; }
+        .response { margin-top: 24px; background: #e9ffe9; border: 1px solid #b2f2b2; padding: 12px; border-radius: 4px; color: #222; }
+        .error { background: #ffe9e9; border: 1px solid #f2b2b2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Enviar para Felipe (16981892476)</h2>
+        <label for="msgFelipe">Mensagem para Felipe:</label>
+        <textarea id="msgFelipe" rows="2" style="width:100%;"></textarea>
+        <button id="btnFelipe" style="width:100%;margin-top:8px;background:#128c7e;">Enviar mensagem Felipe</button>
+        <hr>
+        <label for="captionFelipe">Legenda (opcional)</label>
+        <input type="text" id="captionFelipe">
+        <label for="fileFelipe">Arquivo (imagem, áudio, PDF, etc)</label>
+        <input type="file" id="fileFelipe" required>
+        <button id="btnFileFelipe" style="width:100%;margin-top:8px;background:#128c7e;">Enviar Arquivo para Felipe</button>
+        <hr>
+        <button id="btnListar" style="width:100%;margin-top:8px;background:#007bff;">Listar Contatos e Grupos</button>
+        <div id="listagem" style="margin-top:16px; background:#f4f4f4; border-radius:6px; padding:12px; display:none;"></div>
+        <div id="response" class="response" style="display:none;"></div>
+        <div id="qrContainer" style="display:none; text-align:center; margin-bottom:24px;">
+            <h3>Escaneie o QR Code para conectar</h3>
+            <canvas id="qrCanvas"></canvas>
+        </div>
+    </div>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        const apiBase = 'http://localhost:3333';
+        const responseDiv = document.getElementById('response');
+
+        document.getElementById('btnFelipe').onclick = async function() {
+            responseDiv.style.display = 'none';
+            const message = document.getElementById('msgFelipe').value.trim();
+            if (!message) return;
+            console.log('[Felipe] Enviando mensagem:', message);
+            try {
+                const res = await fetch(apiBase + '/send-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: '16981892476', message })
+                });
+                const data = await res.json();
+                console.log('[Felipe] Resposta da API:', data);
+                showResponse(data, res.ok);
+            } catch (err) {
+                console.error('[Felipe] Erro ao enviar mensagem:', err);
+                showResponse({ message: err.message }, false);
+            }
+        };
+
+        document.getElementById('btnFileFelipe').onclick = async function() {
+            responseDiv.style.display = 'none';
+            const caption = document.getElementById('captionFelipe').value.trim();
+            const fileInput = document.getElementById('fileFelipe');
+            if (!fileInput.files.length) return;
+            const formData = new FormData();
+            formData.append('to', '16981892476');
+            formData.append('caption', caption);
+            formData.append('file', fileInput.files[0]);
+            console.log('[Felipe] Enviando arquivo:', fileInput.files[0].name, '| Legenda:', caption);
+            try {
+                const res = await fetch(apiBase + '/send-media', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                console.log('[Felipe] Resposta da API:', data);
+                showResponse(data, res.ok);
+            } catch (err) {
+                console.error('[Felipe] Erro ao enviar arquivo:', err);
+                showResponse({ message: err.message }, false);
+            }
+        };
+
+        document.getElementById('btnListar').onclick = async function() {
+            const listDiv = document.getElementById('listagem');
+            listDiv.style.display = 'none';
+            listDiv.innerHTML = '';
+            console.log('[Listar] Solicitando contatos e grupos...');
+            try {
+                const res = await fetch(apiBase + '/list-contacts-groups');
+                const data = await res.json();
+                console.log('[Listar] Resposta:', data);
+                if (data.success) {
+                    let html = '<b>Contatos:</b><ul>';
+                    data.contacts.forEach(c => html += `<li>${c.name || '(sem nome)'}<br><small>${c.id}</small></li>`);
+                    html += '</ul><b>Grupos:</b><ul>';
+                    data.groups.forEach(g => html += `<li>${g.name}<br><small>${g.id}</small></li>`);
+                    html += '</ul>';
+                    listDiv.innerHTML = html;
+                    listDiv.style.display = 'block';
+                } else {
+                    listDiv.innerHTML = '<span style="color:red">Erro ao listar: ' + (data.message || 'Erro desconhecido') + '</span>';
+                    listDiv.style.display = 'block';
+                }
+            } catch (err) {
+                console.error('[Listar] Erro:', err);
+                listDiv.innerHTML = '<span style="color:red">Erro ao listar: ' + err.message + '</span>';
+                listDiv.style.display = 'block';
+            }
+        };
+
+        function showResponse(data, ok) {
+            responseDiv.style.display = 'block';
+            responseDiv.className = 'response' + (ok ? '' : ' error');
+            responseDiv.textContent = JSON.stringify(data, null, 2);
+        }
+
+        const socket = io('http://localhost:3333');
+        socket.on('connect', () => {
+            console.log('[Socket.io] Conectado ao backend');
+        });
+        socket.on('qr', (qr) => {
+            console.log('[Socket.io] QR Code recebido:', qr);
+            const qrDiv = document.getElementById('qrContainer');
+            const qrCanvas = document.getElementById('qrCanvas');
+            qrDiv.style.display = 'block';
+            QRCode.toCanvas(qrCanvas, qr, { width: 256 }, function (error) {
+                if (error) console.error(error);
+            });
+        });
+    </script>
+</body>
+</html> 
