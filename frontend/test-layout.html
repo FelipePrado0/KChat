@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Layout Barra de Mensagem</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <style>
+        body {
+            background: #0f0f23;
+            color: white;
+            padding: 20px;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #1a1a2e;
+            border-radius: 18px;
+            padding: 20px;
+        }
+        .test-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #6366f1;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2 class="test-title">Teste do Layout da Barra de Mensagem</h2>
+        
+        <p style="margin-bottom: 20px; color: #b8b8d1;">
+            Esta é uma simulação da barra de mensagem. O textarea deve ocupar 50% do espaço e os ícones devem ficar sempre à direita.
+        </p>
+        
+        <!-- Barra de mensagem de teste -->
+        <div class="message-input-container" id="messageInputContainer">
+            <textarea class="form-control" id="messageInput" placeholder="Digite sua mensagem..." rows="1" maxlength="2000"></textarea>
+            <div class="message-form-buttons">
+                <label for="fileInput" class="btn btn-outline-secondary"><i class="fas fa-paperclip"></i></label>
+                <input type="file" id="fileInput" style="display: none;">
+                <button type="button" id="audioBtn" class="btn btn-outline-secondary" title="Gravar áudio">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button type="button" class="btn btn-primary" title="Enviar mensagem">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #242846; border-radius: 12px;">
+            <h4 style="color: #10b981; margin-bottom: 10px;">Status do Layout:</h4>
+            <ul style="color: #b8b8d1; margin: 0;">
+                <li>✅ HTML sem grid Bootstrap</li>
+                <li>✅ CSS Flexbox aplicado</li>
+                <li>✅ Textarea com flex: 1 1 50%</li>
+                <li>✅ Botões alinhados à direita</li>
+                <li>✅ Layout responsivo</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: center;">
+            <button onclick="window.location.href='index.html'" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> Voltar ao Chat
+            </button>
+        </div>
+    </div>
+</body>
+</html> 

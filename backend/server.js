@@ -1,58 +1,43 @@
-// Importa os módulos necessários
-const express = require('express'); // Framework web para Node.js
-const cors = require('cors'); // Middleware para habilitar CORS
-const rateLimit = require('express-rate-limit'); // Middleware para limitar requisições
-const path = require('path'); // Utilitário para lidar com caminhos de arquivos
-const multer = require('multer'); // Middleware para upload de arquivos
-const http = require('http'); // Adiciona o módulo http
-const { Server } = require('socket.io'); // Importa o socket.io
+const express = require('express');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+const multer = require('multer');
+const http = require('http');
+const { Server } = require('socket.io');
 const { Boom } = require('@hapi/boom');
 const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode');
 const fs = require('fs');
 
-// Importa as rotas
+// Silencia logs do Baileys
+process.env.BAILEYS_LOG_LEVEL = 'silent';
+
+// Configura logger silencioso para o Baileys
+const pino = require('pino');
+const logger = pino({ level: 'silent' });
+
+const config = require('./config');
 const chatRoutes = require('./routes/chatRoutes');
 const privateMessageRoutes = require('./routes/privateMessageRoutes');
 const groupRoutes = require('./routes/groupRoutes');
-
-// Importa utilitário para inicializar o banco de dados
 const { initializeDatabase, logApi } = require('./utils/dbInit');
+const { extractEmpresa } = require('./utils/helpers');
 
-// Configurações do servidor
-const PORT = process.env.PORT || 3000; // Porta padrão
-const NODE_ENV = process.env.NODE_ENV || 'development'; // Ambiente
-
-// Cria a aplicação Express
 const app = express();
 
-// Configura o rate limiting para evitar abuso da API
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-    max: 100, // Limite de 100 requisições por IP
-    message: {
-        success: false,
-        message: 'Muitas requisições deste IP, tente novamente mais tarde.'
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
+const limiter = rateLimit(config.rateLimit);
 
-// Habilita CORS para qualquer origem (apenas para testes)
-app.use(cors());
-
-// Permite receber JSON e dados de formulários
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware de logging: mostra cada requisição no console
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${req.method} ${req.path} - ${req.ip}`);
     next();
 });
 
-// Middleware para tratar erros de JSON inválido
 app.use((err, req, res, next) => {
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
         return res.status(400).json({
@@ -63,15 +48,12 @@ app.use((err, req, res, next) => {
     next();
 });
 
-// Servir arquivos estáticos da pasta uploads (anexos)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Registra as rotas principais
 app.use('/api', groupRoutes);
 app.use('/api', chatRoutes);
 app.use('/api/private-message', privateMessageRoutes);
 
-// Rota de health check (verifica se a API está online)
 app.get('/api/health', (req, res) => {
     res.json({
         success: true,
@@ -80,11 +62,10 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Rota para servir arquivos de upload por nome
 app.get('/api/uploads/:filename', (req, res) => {
     const filename = req.params.filename;
     const filePath = path.join(__dirname, 'uploads', filename);
-    // Log manual do download
+    
     logApi({
         empresa: null,
         rota: req.originalUrl,
@@ -95,24 +76,21 @@ app.get('/api/uploads/:filename', (req, res) => {
         body_response: { file: filename },
         erro: null
     });
+    
     res.sendFile(filePath);
 });
 
-// Middleware para logar todas as respostas da API
+
+
 app.use((req, res, next) => {
     const oldJson = res.json;
     res.json = function (body) {
-        // Tenta extrair empresa de body, query ou headers
-        let empresa = null;
-        if (req.body && req.body.empresa) empresa = req.body.empresa;
-        else if (req.query && req.query.empresa) empresa = req.query.empresa;
-        else if (req.headers && req.headers.empresa) empresa = req.headers.empresa;
         logApi({
-            empresa,
+            empresa: extractEmpresa(req),
             rota: req.originalUrl,
             metodo: req.method,
             status_code: res.statusCode,
-            mensagem: body && body.message ? body.message : null,
+            mensagem: body?.message || null,
             body_request: req.body,
             body_response: body,
             erro: null
@@ -122,38 +100,33 @@ app.use((req, res, next) => {
     next();
 });
 
-// Middleware para tratar erros gerais e de upload
 app.use((err, req, res, next) => {
-    let empresa = null;
-    if (req.body && req.body.empresa) empresa = req.body.empresa;
-    else if (req.query && req.query.empresa) empresa = req.query.empresa;
-    else if (req.headers && req.headers.empresa) empresa = req.headers.empresa;
     logApi({
-        empresa,
+        empresa: extractEmpresa(req),
         rota: req.originalUrl,
         metodo: req.method,
         status_code: 500,
         mensagem: 'Erro interno do servidor',
         body_request: req.body,
         body_response: null,
-        erro: err && err.message ? err.message : String(err)
+        erro: err?.message || String(err)
     });
+    
     console.error('Erro:', err);
-    if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({
-                success: false,
-                message: 'Arquivo muito grande. Tamanho máximo: 10MB'
-            });
-        }
+    
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+            success: false,
+            message: 'Arquivo muito grande. Tamanho máximo: 10MB'
+        });
     }
+    
     res.status(500).json({
         success: false,
         message: 'Erro interno do servidor'
     });
 });
 
-// Rota 404 para qualquer rota não encontrada
 app.use('*', (req, res) => {
     res.status(404).json({
         success: false,
@@ -161,39 +134,38 @@ app.use('*', (req, res) => {
     });
 });
 
-// Cria o servidor HTTP e integra com o Express
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: '*', // Permite qualquer origem (ajuste para produção)
-        methods: ['GET', 'POST']
-    }
+    cors: config.server.cors
 });
 
-// === INTEGRAÇÃO BAILEYS (WhatsApp) ===
 let sock;
 let isReady = false;
+
 (async () => {
-    const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'baileys_auth'));
+    const { state, saveCreds } = await useMultiFileAuthState(config.whatsapp.authPath);
     const { version } = await fetchLatestBaileysVersion();
+    
     sock = makeWASocket({
         version,
         printQRInTerminal: false,
         auth: state,
         syncFullHistory: false,
-        getMessage: async () => undefined
+        getMessage: async () => undefined,
+        logger: logger
     });
+    
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
+        
         if (qr) {
-            // Emite o QR Code para o frontend via Socket.io
             io.emit('qr', qr);
-            // (Opcional) Salva QR como imagem para debug
-            qrcode.toFile(path.join(__dirname, 'last_qr.png'), qr, { width: 256 }, (err) => {
+            qrcode.toFile(config.whatsapp.qrPath, qr, { width: config.whatsapp.qrWidth }, (err) => {
                 if (err) console.error('Erro ao salvar QR:', err);
             });
         }
+        
         if (connection === 'open') {
             isReady = true;
             console.log('✅ Conectado ao WhatsApp via Baileys!');
@@ -205,38 +177,26 @@ let isReady = false;
     });
 })();
 
-// Evento de conexão do socket
 io.on('connection', (socket) => {
-    console.log('Novo usuário conectado:', socket.id);
-
-    // Recebe mensagem do cliente e repassa para todos
     socket.on('nova_mensagem', (mensagem) => {
-        // Aqui você pode salvar no banco se quiser
-        io.emit('mensagem_recebida', mensagem); // Envia para todos conectados
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Usuário desconectado:', socket.id);
+        io.emit('mensagem_recebida', mensagem);
     });
 });
 
-// Função principal para inicializar o servidor e o banco
 async function startServer() {
     try {
-        // Inicializa o banco de dados (cria tabelas se não existirem)
         console.log('Inicializando banco de dados...');
         await initializeDatabase();
         console.log('✓ Banco de dados inicializado');
 
-        // Inicia o servidor HTTP com socket.io
-        server.listen(PORT, () => {
+        server.listen(config.server.port, () => {
             console.log('='.repeat(50));
             console.log('🚀 KChat Backend iniciado com sucesso!');
             console.log('='.repeat(50));
-            console.log(`📡 Servidor rodando na porta: ${PORT}`);
-            console.log(`🌍 Ambiente: ${NODE_ENV}`);
-            console.log(`🔗 URL: http://localhost:${PORT}`);
-            console.log(`📊 Health Check: http://localhost:${PORT}/api/health`);
+            console.log(`📡 Servidor rodando na porta: ${config.server.port}`);
+            console.log(`🌍 Ambiente: ${config.server.environment}`);
+            console.log(`🔗 URL: http://localhost:${config.server.port}`);
+            console.log(`📊 Health Check: http://localhost:${config.server.port}/api/health`);
             console.log('='.repeat(50));
             console.log('📚 Endpoints disponíveis:');
             console.log('   💬 Chat: /api/chat');
@@ -251,7 +211,6 @@ async function startServer() {
     }
 }
 
-// Tratamento de sinais para encerramento seguro
 process.on('SIGINT', () => {
     console.log('\n🛑 Recebido SIGINT. Encerrando servidor...');
     process.exit(0);
@@ -262,7 +221,6 @@ process.on('SIGTERM', () => {
     process.exit(0);
 });
 
-// Tratamento de erros não capturados
 process.on('uncaughtException', (err) => {
     console.error('❌ Erro não capturado:', err);
     process.exit(1);
@@ -273,10 +231,8 @@ process.on('unhandledRejection', (reason, promise) => {
     process.exit(1);
 });
 
-// Inicia o servidor se o arquivo for executado diretamente
 if (require.main === module) {
     startServer();
 }
 
-// Exporta o app para testes ou uso externo
 module.exports = app;

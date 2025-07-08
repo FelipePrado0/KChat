@@ -12,6 +12,9 @@ router.post('/groups', GroupController.createGroup);
 // GET /api/groups/empresa/:empresa
 router.get('/groups/empresa/:empresa', GroupController.getGroupsByEmpresa);
 
+// Rota alternativa para listar grupos de uma empresa (compatibilidade)
+router.get('/groups/:empresa', GroupController.getGroupsByEmpresa);
+
 // Rota para buscar grupo por ID
 // GET /api/groups/:id?empresa=XXX
 router.get('/groups/:id', GroupController.getGroupById);

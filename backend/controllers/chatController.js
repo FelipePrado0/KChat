@@ -1,41 +1,29 @@
-// Importa os models necessários para manipular mensagens e conversas
 const MessageModel = require('../models/messageModel');
 const GroupModel = require('../models/groupModel');
-const multer = require('multer'); // Middleware para upload de arquivos
-const path = require('path'); // Utilitário de caminhos
-const fs = require('fs'); // Sistema de arquivos
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const config = require('../config');
 const { logApi } = require('../utils/dbInit');
+const { validateFileType, createUploadDirectory, generateUniqueFilename } = require('../utils/helpers');
 
-// Configuração do multer para upload de arquivos
 const storage = multer.diskStorage({
-    // Define o diretório de upload
     destination: function (req, file, cb) {
-        const uploadDir = path.join(__dirname, '../uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
+        createUploadDirectory(config.upload.directory);
+        cb(null, config.upload.directory);
     },
-    // Define o nome do arquivo salvo
     filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, generateUniqueFilename(file.originalname));
     }
 });
 
-// Configura o multer com limites e filtros de tipo de arquivo
 const upload = multer({ 
     storage: storage,
     limits: {
-        fileSize: 10 * 1024 * 1024 // Limite de 10MB por arquivo
+        fileSize: config.upload.maxSize
     },
     fileFilter: function (req, file, cb) {
-        // Permite apenas imagens, documentos e PDFs
-        const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-
-        if (mimetype && extname) {
+        if (validateFileType(file, config.upload.allowedTypes)) {
             return cb(null, true);
         } else {
             cb(new Error('Tipo de arquivo não permitido'));
@@ -43,17 +31,11 @@ const upload = multer({
     }
 });
 
-// Controller principal do chat
 class ChatController {
     constructor() {
-        // Instancia o model de mensagens (não é necessário, mas mantido para compatibilidade)
         this.messageModel = new MessageModel();
     }
 
-    /**
-     * Envia uma nova mensagem para um grupo
-     * POST /api/chat/messages
-     */
     async sendMessage(req, res) {
         try {
             console.log('--- [sendMessage] Início ---');
@@ -61,16 +43,14 @@ class ChatController {
             if (req.file) {
                 console.log('Arquivo recebido:', req.file.filename);
             }
-            // Extrai dados do corpo da requisição
+            
             const { group_id, empresa, usuario, mensagem, anexo_link } = req.body;
             let anexoArquivo = null;
 
-            // Se houver arquivo enviado, salva o nome
             if (req.file) {
                 anexoArquivo = req.file.filename;
             }
 
-            // Validações básicas
             if (!group_id || !empresa || !usuario) {
                 console.log('Validação falhou: campos obrigatórios ausentes');
                 return res.status(400).json({
@@ -79,7 +59,6 @@ class ChatController {
                 });
             }
 
-            // Permite mensagem vazia se houver arquivo anexado
             if (!mensagem && !anexoArquivo) {
                 console.log('Validação falhou: mensagem vazia e sem arquivo');
                 return res.status(400).json({
@@ -88,7 +67,6 @@ class ChatController {
                 });
             }
 
-            // Verifica se a conversa existe
             const conversationExists = await GroupModel.exists(group_id, empresa);
             console.log('Conversa existe?', conversationExists);
             if (!conversationExists) {
@@ -99,7 +77,6 @@ class ChatController {
                 });
             }
 
-            // Cria a mensagem no banco
             console.log('Criando mensagem no banco...');
             const message = await MessageModel.create(
                 group_id, 
@@ -109,7 +86,7 @@ class ChatController {
                 anexo_link || null,
                 anexoArquivo
             );
-            // Log manual do envio de mensagem
+            
             logApi({
                 empresa,
                 rota: req.originalUrl,
@@ -120,10 +97,10 @@ class ChatController {
                 body_response: message,
                 erro: null
             });
+            
             console.log('Mensagem criada:', message);
-
-            // Retorna sucesso
             console.log('--- [sendMessage] Fim: sucesso ---');
+            
             res.status(201).json({
                 success: true,
                 message: 'Mensagem enviada com sucesso',
@@ -131,7 +108,6 @@ class ChatController {
             });
 
         } catch (error) {
-            // Captura e retorna erro
             console.error('Erro ao enviar mensagem:', error);
             res.status(500).json({
                 success: false,
@@ -140,16 +116,11 @@ class ChatController {
         }
     }
 
-    /**
-     * Lista mensagens de um grupo específico
-     * GET /api/chat/groups/:group_id/messages
-     */
     async getMessagesByGroup(req, res) {
         try {
             const { group_id } = req.params;
             const { empresa } = req.query;
 
-            // Validação do parâmetro empresa
             if (!empresa) {
                 return res.status(400).json({
                     success: false,
@@ -157,7 +128,6 @@ class ChatController {
                 });
             }
 
-            // Verifica se a conversa existe
             const conversationExists = await GroupModel.exists(group_id, empresa);
             if (!conversationExists) {
                 return res.status(404).json({
@@ -166,10 +136,8 @@ class ChatController {
                 });
             }
 
-            // Busca as mensagens do grupo
             const messages = await MessageModel.findByGroup(group_id, empresa);
 
-            // Retorna as mensagens
             res.json({
                 success: true,
                 data: messages
@@ -184,16 +152,11 @@ class ChatController {
         }
     }
 
-    /**
-     * Edita uma mensagem existente
-     * PUT /api/chat/messages/:id
-     */
     async editMessage(req, res) {
         try {
             const { id } = req.params;
             const { empresa, nova_mensagem } = req.body;
 
-            // Validações
             if (!empresa || !nova_mensagem) {
                 return res.status(400).json({
                     success: false,
@@ -208,7 +171,6 @@ class ChatController {
                 });
             }
 
-            // Atualiza a mensagem no banco
             const updated = await MessageModel.update(id, empresa, nova_mensagem.trim());
 
             if (!updated) {
@@ -232,16 +194,11 @@ class ChatController {
         }
     }
 
-    /**
-     * Deleta (marca como deletada) uma mensagem
-     * DELETE /api/chat/messages/:id
-     */
     async deleteMessage(req, res) {
         try {
             const { id } = req.params;
             const { empresa } = req.body;
 
-            // Validação
             if (!empresa) {
                 return res.status(400).json({
                     success: false,
@@ -249,7 +206,6 @@ class ChatController {
                 });
             }
 
-            // Marca a mensagem como deletada
             const deleted = await MessageModel.delete(id, empresa);
 
             if (!deleted) {
@@ -273,16 +229,11 @@ class ChatController {
         }
     }
 
-    /**
-     * Lista todas as mensagens de uma empresa
-     * GET /api/chat/messages/empresa/:empresa
-     */
     async getMessagesByEmpresa(req, res) {
         try {
             const { empresa } = req.params;
             const { limit } = req.query;
 
-            // Validação
             if (!empresa) {
                 return res.status(400).json({
                     success: false,
@@ -290,7 +241,6 @@ class ChatController {
                 });
             }
 
-            // Busca as mensagens da empresa
             const messages = await MessageModel.findByEmpresa(empresa, parseInt(limit) || 100);
 
             res.json({
@@ -307,16 +257,11 @@ class ChatController {
         }
     }
 
-    /**
-     * Busca uma mensagem específica por ID
-     * GET /api/chat/messages/:id
-     */
     async getMessageById(req, res) {
         try {
             const { id } = req.params;
             const { empresa } = req.query;
 
-            // Validação
             if (!empresa) {
                 return res.status(400).json({
                     success: false,
@@ -324,7 +269,6 @@ class ChatController {
                 });
             }
 
-            // Busca a mensagem
             const message = await MessageModel.findById(id, empresa);
 
             if (!message) {
@@ -348,13 +292,9 @@ class ChatController {
         }
     }
 
-    /**
-     * Middleware para upload de arquivo (usado nas rotas de envio de mensagem)
-     */
     uploadMiddleware() {
         return upload.single('anexo_arquivo');
     }
 }
 
-// Exporta o controller para uso nas rotas
 module.exports = ChatController;

@@ -26,13 +26,20 @@ class GroupController {
     static async getGroupsByEmpresa(req, res) {
         try {
             const { empresa } = req.params;
+            console.log('🔍 Buscando grupos para empresa:', empresa);
+            
             if (!empresa) {
+                console.log('❌ Empresa não fornecida');
                 return res.status(400).json({ success: false, message: 'Empresa é obrigatória' });
             }
+            
             const groups = await GroupModel.findByEmpresa(empresa);
+            console.log('📋 Grupos encontrados:', groups.length, 'grupos');
+            console.log('📋 Dados dos grupos:', groups);
+            
             res.json({ success: true, data: groups });
         } catch (error) {
-            console.error('Erro ao buscar grupos:', error);
+            console.error('❌ Erro ao buscar grupos:', error);
             res.status(500).json({ success: false, message: 'Erro interno do servidor' });
         }
     }

@@ -42,11 +42,16 @@ class GroupModel {
                 WHERE empresa = ? 
                 ORDER BY criado_em DESC
             `;
+            console.log('🔍 Query executada:', query);
+            console.log('🔍 Parâmetro empresa:', empresa);
+            
             // Busca todos os grupos da empresa
             db.all(query, [empresa], (err, rows) => {
                 if (err) {
+                    console.error('❌ Erro na query:', err);
                     reject(err);
                 } else {
+                    console.log('📋 Resultado da query:', rows);
                     resolve(rows);
                 }
             });
