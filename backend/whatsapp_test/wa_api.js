@@ -12,7 +12,12 @@ const { Server } = require('socket.io');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+// CORS definitivo para API REST
+app.use(cors({
+    origin: '*', // Em produção, troque para o domínio do frontend
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+}));
 
 const upload = multer({ dest: path.join(__dirname, 'uploads'), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -57,11 +62,13 @@ function logApi(endpoint, payload, response, error = null) {
     );
 }
 
+// CORS definitivo para Socket.io
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
+        origin: '*', // Em produção, troque para o domínio do frontend
+        methods: ['GET', 'POST'],
+        credentials: true
     }
 });
 

@@ -142,22 +142,24 @@
     <!-- Modal para Criar Novo Grupo -->
     <div class="modal fade" id="newGroupModal" tabindex="-1" aria-labelledby="newGroupModalLabel" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content">
+            <div class="modal-content modal-modern">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="newGroupModalLabel">Criar Novo Grupo</h5>
+                    <h5 class="modal-title" id="newGroupModalLabel">
+                        <i class="fas fa-users"></i> Criar Novo Grupo
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="newGroupForm">
-                        <div class="mb-3">
-                            <label for="groupName" class="form-label">Nome do Grupo</label>
-                            <input type="text" class="form-control" id="groupName" required>
+                    <form id="newGroupForm" autocomplete="off">
+                        <div class="form-group-modern">
+                            <input type="text" id="groupName" required placeholder=" " autocomplete="off">
+                            <label for="groupName">Nome do Grupo</label>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="submitNewGroup()">Criar Grupo</button>
+                    <button type="button" class="btn btn-secondary btn-modern" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary btn-modern" onclick="submitNewGroup()">Criar Grupo</button>
                 </div>
             </div>
         </div>
@@ -222,7 +224,7 @@
     <!-- Modal para Mensagem Privada -->
     <div class="modal fade" id="privateChatModal" tabindex="-1" aria-labelledby="privateChatModalLabel" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content">
+            <div class="modal-content modal-modern">
                 <div class="modal-header">
                     <h5 class="modal-title" id="privateChatModalLabel">
                         <i class="fas fa-user-plus"></i> Nova Mensagem Privada
@@ -230,9 +232,9 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Selecione o usuário para conversar:</label>
-                        <div id="usuariosList" class="usuarios-list">
+                    <div class="form-group-modern">
+                        <label class="form-label" style="left:0;top:0;position:static;color:#b8b8d1;font-size:1rem;">Selecione o usuário para conversar:</label>
+                        <div id="usuariosList" class="usuarios-list" style="margin-top:1.2rem;">
                             <div class="text-center text-muted">
                                 <i class="fas fa-spinner fa-spin"></i>
                                 <p class="mt-2">Carregando usuários...</p>
@@ -319,7 +321,7 @@
     <!-- Modal Criar Conta -->
     <div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content">
+            <div class="modal-content modal-modern">
                 <div class="modal-header">
                     <h5 class="modal-title" id="createUserModalLabel">
                         <i class="fas fa-user-plus"></i> Criar Conta
@@ -327,28 +329,28 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="createUserForm">
-                        <div class="mb-3">
-                            <label for="createUserLogin" class="form-label">Login</label>
-                            <input type="text" class="form-control" id="createUserLogin" required>
+                    <form id="createUserForm" autocomplete="off">
+                        <div class="form-group-modern">
+                            <input type="text" id="createUserLogin" required placeholder=" " autocomplete="off">
+                            <label for="createUserLogin">Login</label>
                         </div>
-                        <div class="mb-3">
-                            <label for="createUserPassword" class="form-label">Senha</label>
-                            <input type="password" class="form-control" id="createUserPassword" required>
+                        <div class="form-group-modern">
+                            <input type="password" id="createUserPassword" required placeholder=" " autocomplete="off">
+                            <label for="createUserPassword">Senha</label>
                         </div>
-                        <div class="mb-3">
-                            <label for="createUserName" class="form-label">Nome</label>
-                            <input type="text" class="form-control" id="createUserName" required>
+                        <div class="form-group-modern">
+                            <input type="text" id="createUserName" required placeholder=" " autocomplete="off">
+                            <label for="createUserName">Nome</label>
                         </div>
                         <div class="mb-3 text-center">
-                            <button type="button" class="btn btn-success" id="btnConnectWhatsappCreate" data-bs-toggle="modal" data-bs-target="#whatsappQrModal">
+                            <button type="button" class="btn btn-success btn-modern" id="btnConnectWhatsappCreate" data-bs-toggle="modal" data-bs-target="#whatsappQrModal">
                                 <i class="fab fa-whatsapp"></i> Conectar WhatsApp
                             </button>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="btnCreateUserSave" disabled>Salvar</button>
+                    <button type="button" class="btn btn-primary btn-modern w-100" id="btnCreateUserSave" disabled>Salvar</button>
                 </div>
             </div>
         </div>
@@ -357,7 +359,7 @@
     <!-- Modal Editar Usuário -->
     <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content">
+            <div class="modal-content modal-modern">
                 <div class="modal-header">
                     <h5 class="modal-title" id="editUserModalLabel">
                         <i class="fas fa-user-edit"></i> Editar Usuário
@@ -365,28 +367,28 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="editUserForm">
-                        <div class="mb-3">
-                            <label for="editUserLogin" class="form-label">Login</label>
-                            <input type="text" class="form-control" id="editUserLogin" required>
+                    <form id="editUserForm" autocomplete="off">
+                        <div class="form-group-modern">
+                            <input type="text" id="editUserLogin" required placeholder=" " autocomplete="off">
+                            <label for="editUserLogin">Login</label>
                         </div>
-                        <div class="mb-3">
-                            <label for="editUserPassword" class="form-label">Senha</label>
-                            <input type="password" class="form-control" id="editUserPassword" required>
+                        <div class="form-group-modern">
+                            <input type="password" id="editUserPassword" required placeholder=" " autocomplete="off">
+                            <label for="editUserPassword">Senha</label>
                         </div>
-                        <div class="mb-3">
-                            <label for="editUserName" class="form-label">Nome</label>
-                            <input type="text" class="form-control" id="editUserName" required>
+                        <div class="form-group-modern">
+                            <input type="text" id="editUserName" required placeholder=" " autocomplete="off">
+                            <label for="editUserName">Nome</label>
                         </div>
                         <div class="mb-3 text-center">
-                            <button type="button" class="btn btn-success" id="btnConnectWhatsappEdit" data-bs-toggle="modal" data-bs-target="#whatsappQrModal">
+                            <button type="button" class="btn btn-success btn-modern" id="btnConnectWhatsappEdit" data-bs-toggle="modal" data-bs-target="#whatsappQrModal">
                                 <i class="fab fa-whatsapp"></i> Conectar WhatsApp
                             </button>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="btnEditUserSave" disabled>Salvar</button>
+                    <button type="button" class="btn btn-primary btn-modern w-100" id="btnEditUserSave" disabled>Salvar</button>
                 </div>
             </div>
         </div>

@@ -1012,3 +1012,43 @@ body {
         gap: 6px;
     }
 }
+
+/* === INPUTS MINIMALISTAS PARA POPUPS (LABEL FLUTUANTE REDUZIDA) === */
+.form-group-modern {
+    position: relative;
+    margin-bottom: 2.2rem;
+}
+.form-group-modern input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #6366f1;
+    color: #fff;
+    font-size: 1.1rem;
+    padding: 12px 0 6px 0;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    border-radius: 0;
+    box-shadow: none;
+}
+.form-group-modern input:focus {
+    border-bottom: 2px solid #10b981;
+    outline: none;
+    box-shadow: 0 2px 0 #10b981;
+}
+.form-group-modern label {
+    position: absolute;
+    left: 0;
+    top: 12px;
+    color: #b8b8d1;
+    font-size: 1rem;
+    pointer-events: none;
+    transition: 0.2s;
+    letter-spacing: 0.01em;
+}
+/* Animação reduzida: label sobe só 1.6px e diminui pouco o tamanho */
+.form-group-modern input:focus + label,
+.form-group-modern input:not(:placeholder-shown) + label {
+    top: 10.4px; /* 12px - 1.6px (90% menor que 16px) */
+    font-size: 0.95rem;
+    color: #10b981;
+}

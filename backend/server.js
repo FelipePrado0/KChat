@@ -28,7 +28,12 @@ const app = express();
 
 const limiter = rateLimit(config.rateLimit);
 
-app.use(cors({ origin: '*' }));
+// CORS definitivo para API REST
+app.use(cors({
+    origin: '*', // Em produção, troque para o domínio do frontend
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -134,9 +139,14 @@ app.use('*', (req, res) => {
     });
 });
 
+// CORS definitivo para Socket.io
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: config.server.cors
+    cors: {
+        origin: '*', // Em produção, troque para o domínio do frontend
+        methods: ['GET', 'POST'],
+        credentials: true
+    }
 });
 
 let sock;

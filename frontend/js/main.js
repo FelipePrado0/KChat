@@ -97,10 +97,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Extrai a base do API_BASE_URL para usar no socket
+    const API_BASE = CONFIG.API_BASE_URL.replace(/\/api$/, '');
+    CONFIG.SOCKET_URL = API_BASE;
+
     (function loadSocketIoScript() {
         if (!window.io) {
             const script = document.createElement('script');
-            script.src = 'http://localhost:3000/socket.io/socket.io.js';
+            script.src = CONFIG.SOCKET_URL + '/socket.io/socket.io.js';
             script.onload = setupSocketIo;
             document.head.appendChild(script);
         } else {
@@ -110,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let socket;
     function setupSocketIo() {
-        socket = io('http://localhost:3000');
+        socket = io(CONFIG.SOCKET_URL);
         console.log('🔌 Socket.io conectado:', socket.id);
 
         socket.on('mensagem_recebida', (mensagem) => {
