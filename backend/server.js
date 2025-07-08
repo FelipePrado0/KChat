@@ -168,11 +168,17 @@ let isReady = false;
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
+        console.log('[WhatsApp] Evento connection.update:', { connection, lastDisconnect: !!lastDisconnect, qr: !!qr });
         
         if (qr) {
+            console.log('[WhatsApp] QR Code recebido do Baileys. Emitindo para o frontend...');
             io.emit('qr', qr);
             qrcode.toFile(config.whatsapp.qrPath, qr, { width: config.whatsapp.qrWidth }, (err) => {
-                if (err) console.error('Erro ao salvar QR:', err);
+                if (err) {
+                    console.error('[WhatsApp] Erro ao salvar QR Code como arquivo:', err);
+                } else {
+                    console.log('[WhatsApp] QR Code salvo em arquivo com sucesso:', config.whatsapp.qrPath);
+                }
             });
         }
         

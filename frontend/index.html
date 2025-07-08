@@ -312,7 +312,8 @@
                 </div>
                 <div class="modal-body text-center">
                     <div id="qrStatus" class="mb-2 text-muted">Aguardando QR Code...</div>
-                    <canvas id="qrCanvas" style="margin:auto;"></canvas>
+                    <div id="qrLoadingSpinner" class="spinner-border text-success" style="width: 3rem; height: 3rem; margin: 32px auto; display: block;"></div>
+                    <canvas id="qrCanvas" style="margin:auto; display: none;"></canvas>
                 </div>
             </div>
         </div>
@@ -402,17 +403,28 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
     let whatsappConnected = false;
+    // Socket principal (backend app)
     const socket = io('http://localhost:3000');
     socket.on('connect', () => {
         console.log('[Socket.io] Conectado ao backend');
     });
-    socket.on('qr', (qr) => {
+    // Socket WhatsApp (QR Code)
+    const waSocket = io('http://localhost:3333');
+    waSocket.on('qr', (qr) => {
         console.log('[Socket.io] QR Code recebido:', qr);
         const qrStatus = document.getElementById('qrStatus');
         const qrCanvas = document.getElementById('qrCanvas');
+        const qrLoadingSpinner = document.getElementById('qrLoadingSpinner');
         qrStatus.textContent = 'Escaneie o QR Code com o WhatsApp para conectar';
+        qrLoadingSpinner.style.display = 'none';
+        qrCanvas.style.display = 'block';
         QRCode.toCanvas(qrCanvas, qr, { width: 256 }, function (error) {
-            if (error) console.error(error);
+            if (error) {
+                console.error('[QR Code] Erro ao gerar o QR Code:', error);
+                qrStatus.textContent = 'Erro ao gerar o QR Code. Tente novamente.';
+            } else {
+                console.log('[QR Code] QR Code gerado e exibido com sucesso!');
+            }
         });
     });
     socket.on('connection.update', (update) => {
@@ -438,6 +450,43 @@
             const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
             modal.show();
         };
+    });
+
+    function handleConnectWhatsappClick(event) {
+        event.preventDefault();
+        const btn = event.currentTarget;
+        btn.disabled = true;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Conectando...';
+        fetch('http://localhost:3333/start-whatsapp', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                // Fechar modais de criar conta ou editar usuário, se abertos
+                const createUserModal = bootstrap.Modal.getInstance(document.getElementById('createUserModal'));
+                if (createUserModal) createUserModal.hide();
+                const editUserModal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
+                if (editUserModal) editUserModal.hide();
+                // Abrir o modal do QR Code
+                const modal = new bootstrap.Modal(document.getElementById('whatsappQrModal'));
+                modal.show();
+            })
+            .catch(() => {
+                alert('Erro ao iniciar conexão com o WhatsApp.');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    }
+
+    // Substituir o data-bs-toggle/data-bs-target por evento manual
+    ['btnConnectWhatsapp', 'btnConnectWhatsappCreate', 'btnConnectWhatsappEdit'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.removeAttribute('data-bs-toggle');
+            btn.removeAttribute('data-bs-target');
+            btn.addEventListener('click', handleConnectWhatsappClick);
+        }
     });
     </script>
 </body>

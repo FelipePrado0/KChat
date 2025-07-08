@@ -3,6 +3,7 @@ const { Boom } = require('@hapi/boom');
 const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, makeInMemoryStore } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
+const fsp = require('fs').promises;
 const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
@@ -23,6 +24,71 @@ const upload = multer({ dest: path.join(__dirname, 'uploads'), limits: { fileSiz
 
 let sock;
 let isReady = false;
+let isStarting = false;
+
+async function startWhatsappConnection() {
+    if (isReady || isStarting) {
+        console.log('[WhatsApp] Conexão já está ativa ou em inicialização.');
+        return;
+    }
+    isStarting = true;
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'baileys_auth'));
+        const { version } = await fetchLatestBaileysVersion();
+        sock = makeWASocket({
+            version,
+            printQRInTerminal: false,
+            auth: state,
+            syncFullHistory: false,
+            getMessage: async () => undefined
+        });
+        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('connection.update', (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            console.log('[WhatsApp] Evento connection.update:', { connection, lastDisconnect: !!lastDisconnect, qr: !!qr });
+            if (qr) {
+                console.log('[WhatsApp] QR Code gerado e emitido para o frontend.');
+                io.emit('qr', qr);
+            }
+            if (connection === 'open') {
+                isReady = true;
+                isStarting = false;
+                console.log('✅ Conectado ao WhatsApp via Baileys!');
+            } else if (connection === 'close') {
+                isReady = false;
+                isStarting = false;
+                const reason = lastDisconnect?.error instanceof Boom ? lastDisconnect.error.output.statusCode : lastDisconnect?.error;
+                console.log('🔌 Conexão WhatsApp fechada:', reason);
+            }
+        });
+        sock.ev.on('messages.upsert', async (m) => {
+            if (!m.messages || !m.messages[0]) return;
+            const msg = m.messages[0];
+            if (msg.key.fromMe) return;
+            const from = msg.key.remoteJid;
+            const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '[Mídia ou mensagem não textual]';
+            const type = Object.keys(msg.message || {})[0] || 'unknown';
+            const msg_id = msg.key.id;
+            const timestamp = msg.messageTimestamp;
+            const criado_em = nowGmt3();
+            console.log(`📩 Mensagem recebida de ${from}: ${body}`);
+            db.run(
+                `INSERT INTO mensagens_whatsapp (msg_id, from_jid, content, timestamp, type, criado_em, deletado_em) VALUES (?, ?, ?, ?, ?, ?, NULL)` ,
+                [msg_id, from, body, timestamp, type, criado_em],
+                (err) => {
+                    if (err) {
+                        console.error('Erro ao salvar mensagem no banco:', err);
+                    } else {
+                        console.log('💾 Mensagem salva no banco de dados.');
+                    }
+                }
+            );
+        });
+    } catch (err) {
+        isStarting = false;
+        console.error('[WhatsApp] Erro ao iniciar conexão:', err);
+    }
+}
 
 const DB_PATH = path.join(__dirname, 'whatsapp.db');
 const db = new sqlite3.Database(DB_PATH);
@@ -76,59 +142,14 @@ io.on('connection', (socket) => {
     console.log('🟢 Frontend conectado ao Socket.io:', socket.id);
 });
 
-(async () => {
-    const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'baileys_auth'));
-    const { version } = await fetchLatestBaileysVersion();
-    sock = makeWASocket({
-        version,
-        printQRInTerminal: true,
-        auth: state,
-        syncFullHistory: false,
-        getMessage: async () => undefined
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        if (qr) {
-            qrcode.generate(qr, { small: true });
-            io.emit('qr', qr);
-        }
-        if (connection === 'open') {
-            isReady = true;
-            console.log('✅ Conectado ao WhatsApp via Baileys!');
-        } else if (connection === 'close') {
-            isReady = false;
-            const reason = lastDisconnect?.error instanceof Boom ? lastDisconnect.error.output.statusCode : lastDisconnect?.error;
-            console.log('🔌 Conexão fechada:', reason);
-        }
-    });
-
-    sock.ev.on('messages.upsert', async (m) => {
-        if (!m.messages || !m.messages[0]) return;
-        const msg = m.messages[0];
-        if (msg.key.fromMe) return;
-        const from = msg.key.remoteJid;
-        const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '[Mídia ou mensagem não textual]';
-        const type = Object.keys(msg.message || {})[0] || 'unknown';
-        const msg_id = msg.key.id;
-        const timestamp = msg.messageTimestamp;
-        const criado_em = nowGmt3();
-        console.log(`📩 Mensagem recebida de ${from}: ${body}`);
-        db.run(
-            `INSERT INTO mensagens_whatsapp (msg_id, from_jid, content, timestamp, type, criado_em, deletado_em) VALUES (?, ?, ?, ?, ?, ?, NULL)` ,
-            [msg_id, from, body, timestamp, type, criado_em],
-            (err) => {
-                if (err) {
-                    console.error('Erro ao salvar mensagem no banco:', err);
-                } else {
-                    console.log('💾 Mensagem salva no banco de dados.');
-                }
-            }
-        );
-    });
-})();
+// Rota para iniciar a conexão WhatsApp sob demanda
+app.post('/start-whatsapp', async (req, res) => {
+    if (isReady || isStarting) {
+        return res.json({ success: true, message: 'Conexão já está ativa ou em inicialização.' });
+    }
+    startWhatsappConnection();
+    res.json({ success: true, message: 'Inicialização do WhatsApp iniciada.' });
+});
 
 function formatTo(to) {
     if (to.endsWith('@s.whatsapp.net') || to.endsWith('@g.us')) return to;
@@ -201,6 +222,26 @@ app.get('/list-contacts-groups', async (req, res) => {
     } catch (err) {
         logApi('/list-contacts-groups', {}, null, err);
         res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Rota para resetar a sessão do WhatsApp (forçar novo QR)
+app.post('/reset-session', async (req, res) => {
+    const authPath = path.join(__dirname, 'baileys_auth');
+    try {
+        if (fs.existsSync(authPath)) {
+            await fsp.rm(authPath, { recursive: true, force: true });
+            console.log('[WhatsApp] Pasta de autenticação removida com sucesso.');
+        } else {
+            console.log('[WhatsApp] Pasta de autenticação não existe, nada para remover.');
+        }
+        // Reiniciar o processo (simples: process.exit para PM2/docker, ou reiniciar manualmente)
+        console.log('[WhatsApp] Reiniciando processo para forçar novo QR...');
+        res.json({ success: true, message: 'Sessão resetada. Reinicie o serviço para novo QR.' });
+        process.exit(0);
+    } catch (err) {
+        console.error('[WhatsApp] Erro ao resetar sessão:', err);
+        res.status(500).json({ success: false, message: 'Erro ao resetar sessão', error: err.message });
     }
 });
 
