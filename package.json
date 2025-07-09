@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "init-db": "node utils/dbInit.js"
+    "init-db": "node utils/dbInit.js",
+    "build": "npm install",
+    "postinstall": "npm run init-db"
   },
   "keywords": [
     "chat",
