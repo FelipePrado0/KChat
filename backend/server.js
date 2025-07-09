@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const { Boom } = require('@hapi/boom');
 const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode');
+const qrcodeTerminal = require('qrcode-terminal');
 const fs = require('fs');
 
 // Silencia logs do Baileys
@@ -172,7 +173,20 @@ let isReady = false;
         
         if (qr) {
             console.log('[WhatsApp] QR Code recebido do Baileys. Emitindo para o frontend...');
+            
+            // Exibir QR Code no terminal
+            console.log('\n' + '='.repeat(50));
+            console.log('📱 QR CODE DO WHATSAPP - ESCANEIE COM SEU CELULAR');
+            console.log('='.repeat(50));
+            qrcodeTerminal.generate(qr, { small: true });
+            console.log('='.repeat(50));
+            console.log('💡 Dica: Abra o WhatsApp no celular > Configurações > Aparelhos conectados > Conectar um aparelho');
+            console.log('='.repeat(50) + '\n');
+            
+            // Emitir para o frontend
             io.emit('qr', qr);
+            
+            // Salvar QR Code como arquivo
             qrcode.toFile(config.whatsapp.qrPath, qr, { width: config.whatsapp.qrWidth }, (err) => {
                 if (err) {
                     console.error('[WhatsApp] Erro ao salvar QR Code como arquivo:', err);
